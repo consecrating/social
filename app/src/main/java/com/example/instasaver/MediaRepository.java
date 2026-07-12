@@ -3,13 +3,16 @@ package com.example.instasaver;
 import android.content.ContentResolver;
 import android.content.ContentValues;
 import android.content.Context;
+import android.database.Cursor;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Environment;
 import android.provider.MediaStore;
+import android.provider.OpenableColumns;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
@@ -251,6 +254,65 @@ public class MediaRepository {
         if (target.equals(item.file)) return item.file;
         if (target.exists()) target = uniquify(target);
         return item.file.renameTo(target) ? target : null;
+    }
+
+    /**
+     * Import a gallery item (content URI) into a vault album. Copies the bytes
+     * into the app's private album folder so a hidden copy exists. Returns the
+     * new file, or null on failure.
+     */
+    public File importUri(Uri uri, String album) {
+        if (uri == null) return null;
+        ContentResolver cr = appContext.getContentResolver();
+        String mime = cr.getType(uri);
+        String display = queryDisplayName(cr, uri);
+
+        boolean isVideo = (mime != null && mime.startsWith("video"))
+                || (mime == null && display != null && looksLikeVideo(display));
+        boolean isImage = mime != null && mime.startsWith("image");
+        if (!isVideo && !isImage && mime != null) {
+            return null; // not a photo or video
+        }
+
+        File dir = ensureDir(isVideo, album);
+        if (dir == null) return null;
+
+        String ext = isVideo ? ".mp4" : ".jpg";
+        String name = (display == null || display.isEmpty())
+                ? "import_" + System.currentTimeMillis() + ext
+                : sanitize(display);
+        File target = new File(dir, name);
+        if (target.exists()) target = uniquify(target);
+
+        try (InputStream in = cr.openInputStream(uri);
+             OutputStream out = new FileOutputStream(target)) {
+            if (in == null) return null;
+            byte[] buf = new byte[8192];
+            int n;
+            while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
+        } catch (Exception e) {
+            target.delete();
+            return null;
+        }
+        return target;
+    }
+
+    private boolean looksLikeVideo(String name) {
+        String lower = name.toLowerCase(Locale.US);
+        for (String ext : VIDEO_EXT) if (lower.endsWith(ext)) return true;
+        return false;
+    }
+
+    private String queryDisplayName(ContentResolver cr, Uri uri) {
+        try (Cursor c = cr.query(uri, new String[]{OpenableColumns.DISPLAY_NAME},
+                null, null, null)) {
+            if (c != null && c.moveToFirst()) {
+                int idx = c.getColumnIndex(OpenableColumns.DISPLAY_NAME);
+                if (idx >= 0) return c.getString(idx);
+            }
+        } catch (Exception ignored) {
+        }
+        return null;
     }
 
     /**

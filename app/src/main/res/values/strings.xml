@@ -22,6 +22,7 @@
     <string name="empty_album">No albums yet.\nSelect items in Reels or Photos and choose \"Move to album\".</string>
 
     <string name="albums_title">Albums (hidden)</string>
+    <string name="import_from_gallery">Import from gallery</string>
 
     <string name="actions">Actions</string>
     <string name="viewer_close">Close</string>
