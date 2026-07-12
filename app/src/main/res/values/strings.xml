@@ -10,9 +10,15 @@
     <string name="tab_download">Download</string>
     <string name="tab_reels">Reels</string>
     <string name="tab_photos">Photos</string>
+    <string name="tab_my_reels">My Reels</string>
+    <string name="tab_my_photos">My Photos</string>
+    <string name="tab_delete">Delete</string>
 
     <string name="empty_reels">No reels yet.\nDownload one from the Download tab.</string>
     <string name="empty_photos">No photos yet.\nDownload one from the Download tab.</string>
+    <string name="empty_my_reels">No reels here yet.\nSelect reels and move them to \"My Reels\".</string>
+    <string name="empty_my_photos">No photos here yet.\nSelect photos and move them to \"My Photos\".</string>
+    <string name="empty_delete">Delete bin is empty.\nMove items here, then delete them for good.</string>
 
     <string name="actions">Actions</string>
     <string name="action_open">Open</string>
@@ -21,4 +27,19 @@
     <string name="action_move">Move to album</string>
     <string name="action_rename">Rename</string>
     <string name="action_delete">Delete</string>
+    <string name="action_move_my_reels">Move to My Reels</string>
+    <string name="action_move_my_photos">Move to My Photos</string>
+    <string name="action_move_delete">Move to Delete bin</string>
+    <string name="action_remove_fav">Remove from this collection</string>
+    <string name="action_restore">Restore to library</string>
+
+    <!-- selection mode -->
+    <string name="sel_select_all">Select all</string>
+    <string name="sel_cancel">Cancel</string>
+    <string name="sel_to_favorite">Add to collection</string>
+    <string name="sel_to_delete">Move to Delete</string>
+    <string name="sel_restore">Restore</string>
+    <string name="sel_delete_now">Delete</string>
+    <string name="sel_share">Share</string>
+    <string name="sel_move_album">Album</string>
 </resources>

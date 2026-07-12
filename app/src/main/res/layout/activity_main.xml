@@ -25,9 +25,13 @@
             android:id="@+id/tabs"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:background="@color/purple"
+            app:tabMode="scrollable"
+            app:tabGravity="start"
             app:tabTextColor="#CCFFFFFF"
             app:tabSelectedTextColor="@color/white"
             app:tabIndicatorColor="@color/white"
+            app:tabIndicatorFullWidth="false"
             app:tabIndicatorHeight="3dp" />
     </com.google.android.material.appbar.AppBarLayout>
 

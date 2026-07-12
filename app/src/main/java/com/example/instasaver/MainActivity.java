@@ -25,13 +25,16 @@ public class MainActivity extends AppCompatActivity {
         ViewPager2 pager = findViewById(R.id.pager);
         TabLayout tabs = findViewById(R.id.tabs);
         pager.setAdapter(new MainPagerAdapter(this));
-        pager.setOffscreenPageLimit(2);
+        pager.setOffscreenPageLimit(1);
 
         new TabLayoutMediator(tabs, pager, (tab, position) -> {
             switch (position) {
                 case 0: tab.setText(R.string.tab_download); break;
                 case 1: tab.setText(R.string.tab_reels); break;
-                default: tab.setText(R.string.tab_photos); break;
+                case 2: tab.setText(R.string.tab_photos); break;
+                case 3: tab.setText(R.string.tab_my_reels); break;
+                case 4: tab.setText(R.string.tab_my_photos); break;
+                default: tab.setText(R.string.tab_delete); break;
             }
         }).attach();
 

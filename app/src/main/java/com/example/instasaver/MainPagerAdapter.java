@@ -5,7 +5,9 @@ import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentActivity;
 import androidx.viewpager2.adapter.FragmentStateAdapter;
 
-/** Three tabs: Download, Reels (videos), Photos (images). */
+/**
+ * Tabs: Download, Reels, Photos, My Reels, My Photos, Delete.
+ */
 public class MainPagerAdapter extends FragmentStateAdapter {
 
     public MainPagerAdapter(@NonNull FragmentActivity activity) {
@@ -14,7 +16,7 @@ public class MainPagerAdapter extends FragmentStateAdapter {
 
     @Override
     public int getItemCount() {
-        return 3;
+        return 6;
     }
 
     @NonNull
@@ -24,9 +26,15 @@ public class MainPagerAdapter extends FragmentStateAdapter {
             case 0:
                 return new DownloadFragment();
             case 1:
-                return MediaListFragment.newInstance(true);   // reels / videos
+                return MediaListFragment.library(true);    // Reels
+            case 2:
+                return MediaListFragment.library(false);   // Photos
+            case 3:
+                return MediaListFragment.favorites(true);  // My Reels
+            case 4:
+                return MediaListFragment.favorites(false); // My Photos
             default:
-                return MediaListFragment.newInstance(false);  // photos
+                return MediaListFragment.trash();          // Delete bin
         }
     }
 }

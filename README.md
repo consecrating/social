@@ -17,15 +17,20 @@ Install:
 
 ## Features
 
-- **Three tabs:** Download, Reels (videos), Photos.
-- **Built-in library** — a thumbnail gallery of everything you've downloaded, split
-  into Reels and Photos.
+- **Six tabs:** Download, Reels, Photos, **My Reels**, **My Photos**, and **Delete**.
+  - **Reels / Photos** — your full downloaded library, split by type.
+  - **My Reels / My Photos** — curated collections; move your favorites here.
+  - **Delete** — a bin that holds both reels and photos you no longer want, so you
+    can review before removing them for good.
+- **Multi-select** — long-press any item to enter selection mode, then move or
+  delete many items at once (with Select all / Cancel).
+- **Built-in gallery** — thumbnail grid of everything, with a play badge on videos.
 - **Organize your downloads:**
-  - **Albums** — group items into folders; filter each tab by album.
+  - **Albums** — group library items into folders; filter each tab by album.
   - **Sort** — Newest, Oldest, Name, or Largest.
-  - **Rename**, **Move to album**, and **Delete** any item.
+  - **Rename**, **Move to album**, move to collections, or move to the Delete bin.
 - **Open / Play** an item in your favorite player or viewer.
-- **Share** directly to other apps.
+- **Share** one or many items to other apps.
 - **Save to phone gallery** — export a copy into your system Photos/Gallery.
 - **Carousels** — multi-item posts download every photo/video.
 

@@ -35,6 +35,23 @@
             android:src="@drawable/ic_more"
             android:background="#55000000"
             android:contentDescription="@string/actions" />
+
+        <View
+            android:id="@+id/selectionTint"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="#66C13584"
+            android:visibility="gone" />
+
+        <ImageView
+            android:id="@+id/check"
+            android:layout_width="26dp"
+            android:layout_height="26dp"
+            android:layout_gravity="top|start"
+            android:layout_margin="4dp"
+            android:src="@drawable/ic_check"
+            android:visibility="gone"
+            android:contentDescription="@string/sel_select_all" />
     </FrameLayout>
 
     <TextView

@@ -40,6 +40,14 @@ public class MediaRepository {
     /** Sentinel album filter meaning "show everything". */
     public static final String ALL = "All";
 
+    /** Reserved collection folders (kept out of the normal library/album views). */
+    public static final String FAV_DIR = "Favorites";
+    public static final String TRASH_DIR = "Trash";
+
+    public static boolean isReserved(String name) {
+        return FAV_DIR.equals(name) || TRASH_DIR.equals(name);
+    }
+
     private static final String[] VIDEO_EXT = {".mp4", ".mov", ".webm", ".mkv"};
     private static final String[] PHOTO_EXT = {".jpg", ".jpeg", ".png", ".webp", ".heic"};
 
@@ -82,13 +90,40 @@ public class MediaRepository {
             collect(root, isVideo, null, items);
             File[] dirs = root.listFiles(File::isDirectory);
             if (dirs != null) {
-                for (File d : dirs) collect(d, isVideo, d.getName(), items);
+                for (File d : dirs) {
+                    if (!isReserved(d.getName())) collect(d, isVideo, d.getName(), items);
+                }
             }
         } else {
             File dir = new File(root, sanitize(albumFilter));
             collect(dir, isVideo, albumFilter, items);
         }
 
+        sortItems(items, sort);
+        return items;
+    }
+
+    /**
+     * List a single reserved collection (Favorites or Trash) for one media type.
+     */
+    public List<DownloadedItem> listCollection(boolean isVideo, String reservedDir, Sort sort) {
+        List<DownloadedItem> items = new ArrayList<>();
+        File root = root(isVideo);
+        if (root == null) return items;
+        collect(new File(root, reservedDir), isVideo, null, items);
+        sortItems(items, sort);
+        return items;
+    }
+
+    /**
+     * The Delete bin holds BOTH videos and photos, so gather both trash folders.
+     */
+    public List<DownloadedItem> listTrashBoth(Sort sort) {
+        List<DownloadedItem> items = new ArrayList<>();
+        File videoRoot = root(true);
+        File photoRoot = root(false);
+        if (videoRoot != null) collect(new File(videoRoot, TRASH_DIR), true, null, items);
+        if (photoRoot != null) collect(new File(photoRoot, TRASH_DIR), false, null, items);
         sortItems(items, sort);
         return items;
     }
@@ -113,7 +148,9 @@ public class MediaRepository {
             if (dirs != null) {
                 Arrays.sort(dirs, (a, b) -> a.getName().compareToIgnoreCase(b.getName()));
                 for (File d : dirs) {
-                    if (containsMedia(d, isVideo)) names.add(d.getName());
+                    if (!isReserved(d.getName()) && containsMedia(d, isVideo)) {
+                        names.add(d.getName());
+                    }
                 }
             }
         }
