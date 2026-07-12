@@ -68,6 +68,7 @@ public class MediaListFragment extends Fragment implements MediaAdapter.Listener
 
     private RecyclerView recycler;
     private TextView emptyView;
+    private TextView countLabel;
     private View controlsRow;
     private Spinner albumSpinner;
     private Spinner sortSpinner;
@@ -128,6 +129,7 @@ public class MediaListFragment extends Fragment implements MediaAdapter.Listener
 
         recycler = v.findViewById(R.id.recycler);
         emptyView = v.findViewById(R.id.emptyView);
+        countLabel = v.findViewById(R.id.countLabel);
         controlsRow = v.findViewById(R.id.controlsRow);
         albumSpinner = v.findViewById(R.id.albumSpinner);
         sortSpinner = v.findViewById(R.id.sortSpinner);
@@ -209,6 +211,8 @@ public class MediaListFragment extends Fragment implements MediaAdapter.Listener
                 break;
         }
         adapter.submit(items);
+        int n = items.size();
+        countLabel.setText(n + (n == 1 ? " file" : " files"));
         emptyView.setVisibility(items.isEmpty() ? View.VISIBLE : View.GONE);
         recycler.setVisibility(items.isEmpty() ? View.GONE : View.VISIBLE);
     }
@@ -331,7 +335,7 @@ public class MediaListFragment extends Fragment implements MediaAdapter.Listener
     private void addSelBtnHold(int labelRes, Runnable action) {
         Button b = new Button(requireContext(),
                 null, android.R.attr.borderlessButtonStyle);
-        b.setText(getString(labelRes) + " (hold 5s)");
+        b.setText(labelRes);
         b.setTextColor(getResources().getColor(R.color.white));
         b.setTextSize(12f);
         b.setAllCaps(false);
@@ -346,7 +350,6 @@ public class MediaListFragment extends Fragment implements MediaAdapter.Listener
         v.setOnTouchListener((view, ev) -> {
             switch (ev.getActionMasked()) {
                 case MotionEvent.ACTION_DOWN:
-                    toast("Keep holding to unlock…");
                     handler.postDelayed(fire, HOLD_MS);
                     return true;
                 case MotionEvent.ACTION_UP:
@@ -527,7 +530,7 @@ public class MediaListFragment extends Fragment implements MediaAdapter.Listener
     /** A private action row that only fires after a 5-second press. */
     private void addSheetRowHold(LinearLayout parent, int labelRes, Runnable action) {
         TextView row = new TextView(requireContext());
-        row.setText(getString(labelRes) + "  (hold 5s to unlock)");
+        row.setText(labelRes);
         row.setTextSize(15f);
         row.setPadding(dp(16), dp(16), dp(16), dp(16));
         row.setClickable(true);
