@@ -15,12 +15,35 @@ Install:
 2. Enable *Install unknown apps* for your file manager/browser.
 3. Tap the APK and install.
 
+## Features
+
+- **Three tabs:** Download, Reels (videos), Photos.
+- **Built-in library** — a thumbnail gallery of everything you've downloaded, split
+  into Reels and Photos.
+- **Organize your downloads:**
+  - **Albums** — group items into folders; filter each tab by album.
+  - **Sort** — Newest, Oldest, Name, or Largest.
+  - **Rename**, **Move to album**, and **Delete** any item.
+- **Open / Play** an item in your favorite player or viewer.
+- **Share** directly to other apps.
+- **Save to phone gallery** — export a copy into your system Photos/Gallery.
+- **Carousels** — multi-item posts download every photo/video.
+
 ## How to use
 
-- Open **InstaSaver**, paste a public Instagram post/reel link, and tap **Download**, or
-- In Instagram, tap **Share -> InstaSaver** to send the link straight to the app.
+- Open **InstaSaver**, paste a public Instagram post/reel link on the **Download**
+  tab and tap **Download**, or in Instagram tap **Share -> InstaSaver**.
+- Downloaded videos appear under **Reels**, photos under **Photos**.
+- Tap an item to open it; long-press (or the ⋮ button) for actions: Open, Share,
+  Save to gallery, Move to album, Rename, Delete.
 
-Videos/reels are saved as `.mp4` and photos as `.jpg` in your phone's **Downloads** folder.
+### Where files are stored
+
+To let the app manage its own library without asking for broad storage permissions,
+downloads are saved to the app's **private external folder**
+(`Android/data/com.example.instasaver/files/Movies` and `.../Pictures`). Use
+**Save to phone gallery** on any item to also place a copy in your system Gallery.
+Uninstalling the app removes its private library (but not items you exported).
 
 ## How it works
 
@@ -50,6 +73,8 @@ The direct media URL is then handed to Android's built-in `DownloadManager`.
   if every request starts failing, update the `DOC_IDS` array in
   `InstagramExtractor.java`.
 - **Carousels** (multi-item posts) are supported — all items download.
+- Downloads are stored in the app's private external folder; use **Save to phone
+  gallery** to copy an item into your system Gallery.
 - The bundled APK is **debug-signed** (fine for personal use).
 
 ## Building from source

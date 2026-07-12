@@ -4,4 +4,21 @@
     <string name="download">Download</string>
     <string name="paste">Paste</string>
     <string name="disclaimer">Only download media you own or have permission to use.</string>
+
+    <string name="download_hint_title">Paste a public Instagram post or reel link</string>
+
+    <string name="tab_download">Download</string>
+    <string name="tab_reels">Reels</string>
+    <string name="tab_photos">Photos</string>
+
+    <string name="empty_reels">No reels yet.\nDownload one from the Download tab.</string>
+    <string name="empty_photos">No photos yet.\nDownload one from the Download tab.</string>
+
+    <string name="actions">Actions</string>
+    <string name="action_open">Open</string>
+    <string name="action_share">Share</string>
+    <string name="action_save_gallery">Save to phone gallery</string>
+    <string name="action_move">Move to album</string>
+    <string name="action_rename">Rename</string>
+    <string name="action_delete">Delete</string>
 </resources>

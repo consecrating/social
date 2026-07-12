@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingTop="8dp"
+    android:paddingBottom="16dp">
+
+    <TextView
+        android:id="@+id/actionHeader"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="16dp"
+        android:textStyle="bold"
+        android:maxLines="1"
+        android:ellipsize="middle"
+        android:textSize="15sp" />
+
+    <TextView
+        android:id="@+id/actionOpen"
+        style="@style/ActionRow"
+        android:text="@string/action_open" />
+
+    <TextView
+        android:id="@+id/actionShare"
+        style="@style/ActionRow"
+        android:text="@string/action_share" />
+
+    <TextView
+        android:id="@+id/actionSaveGallery"
+        style="@style/ActionRow"
+        android:text="@string/action_save_gallery" />
+
+    <TextView
+        android:id="@+id/actionMove"
+        style="@style/ActionRow"
+        android:text="@string/action_move" />
+
+    <TextView
+        android:id="@+id/actionRename"
+        style="@style/ActionRow"
+        android:text="@string/action_rename" />
+
+    <TextView
+        android:id="@+id/actionDelete"
+        style="@style/ActionRow"
+        android:text="@string/action_delete"
+        android:textColor="#D32F2F" />
+</LinearLayout>
