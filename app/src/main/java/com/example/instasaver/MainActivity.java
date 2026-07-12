@@ -39,16 +39,35 @@ public class MainActivity extends AppCompatActivity {
             }
         }).attach();
 
-        // Hidden gesture: long-press the title to open the private Albums vault.
+        // Hidden gesture: press-and-hold the title for 3 seconds to open the vault.
         View title = findViewById(R.id.appTitle);
         if (title != null) {
-            title.setOnLongClickListener(v -> {
-                startActivity(new Intent(this, AlbumsActivity.class));
-                return true;
-            });
+            attachHoldToOpenVault(title);
         }
 
         handleShareIntent(getIntent());
+    }
+
+    @SuppressWarnings("ClickableViewAccessibility")
+    private void attachHoldToOpenVault(View title) {
+        final android.os.Handler handler = new android.os.Handler(getMainLooper());
+        final Runnable open = () -> {
+            VaultLock.unlock();
+            startActivity(new Intent(this, AlbumsActivity.class));
+        };
+        title.setOnTouchListener((v, ev) -> {
+            switch (ev.getActionMasked()) {
+                case android.view.MotionEvent.ACTION_DOWN:
+                    handler.postDelayed(open, 3000);
+                    return true;
+                case android.view.MotionEvent.ACTION_UP:
+                case android.view.MotionEvent.ACTION_CANCEL:
+                    handler.removeCallbacks(open);
+                    return true;
+                default:
+                    return false;
+            }
+        });
     }
 
     @Override

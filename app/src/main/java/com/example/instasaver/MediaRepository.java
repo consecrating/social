@@ -320,6 +320,26 @@ public class MediaRepository {
      * up in Photos/Gallery apps. Returns true on success.
      */
     public boolean saveToGallery(DownloadedItem item) {
+        return exportToGallery(item, "InstaSaver");
+    }
+
+    /**
+     * Move an item out of the vault back to the phone gallery's normal location,
+     * keeping the exact same file name (no renaming/re-encoding), then remove the
+     * vault copy. Returns true on success.
+     */
+    public boolean moveToGallery(DownloadedItem item) {
+        if (exportToGallery(item, null)) {
+            return delete(item);
+        }
+        return false;
+    }
+
+    /**
+     * Copy an item into the public gallery.
+     * @param subdir optional subfolder under Pictures/Movies; null = top level.
+     */
+    public boolean exportToGallery(DownloadedItem item, String subdir) {
         ContentResolver resolver = appContext.getContentResolver();
         String mime = item.isVideo ? "video/mp4" : "image/jpeg";
 
@@ -329,8 +349,10 @@ public class MediaRepository {
 
         Uri collection;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            String rel = (item.isVideo ? Environment.DIRECTORY_MOVIES
-                    : Environment.DIRECTORY_PICTURES) + File.separator + "InstaSaver";
+            String base = item.isVideo ? Environment.DIRECTORY_MOVIES
+                    : Environment.DIRECTORY_PICTURES;
+            String rel = (subdir != null && !subdir.isEmpty())
+                    ? base + File.separator + subdir : base;
             values.put(MediaStore.MediaColumns.RELATIVE_PATH, rel);
             values.put(MediaStore.MediaColumns.IS_PENDING, 1);
             collection = item.isVideo

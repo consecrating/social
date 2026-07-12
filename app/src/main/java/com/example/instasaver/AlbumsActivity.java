@@ -20,6 +20,8 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.google.android.material.tabs.TabLayout;
+
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
@@ -40,6 +42,7 @@ public class AlbumsActivity extends AppCompatActivity implements AlbumFolderAdap
     private TextView emptyView;
 
     private String pendingCoverAlbum; // album whose cover image is being picked
+    private boolean currentTypeVideo = true; // Reels tab (true) vs Photos tab (false)
 
     private final ExecutorService io = Executors.newSingleThreadExecutor();
     private final Handler main = new Handler(Looper.getMainLooper());
@@ -87,16 +90,56 @@ public class AlbumsActivity extends AppCompatActivity implements AlbumFolderAdap
         recycler.setLayoutManager(new GridLayoutManager(this, 2));
         adapter = new AlbumFolderAdapter(repo, meta, this);
         recycler.setAdapter(adapter);
+
+        TabLayout typeTabs = findViewById(R.id.albumTypeTabs);
+        typeTabs.addTab(typeTabs.newTab().setText(R.string.tab_reels));
+        typeTabs.addTab(typeTabs.newTab().setText(R.string.tab_photos));
+        typeTabs.addOnTabSelectedListener(new TabLayout.OnTabSelectedListener() {
+            @Override
+            public void onTabSelected(TabLayout.Tab tab) {
+                currentTypeVideo = tab.getPosition() == 0;
+                reload();
+            }
+
+            @Override
+            public void onTabUnselected(TabLayout.Tab tab) { }
+
+            @Override
+            public void onTabReselected(TabLayout.Tab tab) { }
+        });
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        VaultLock.onVaultScreenStart();
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        VaultLock.onVaultScreenStop();
+    }
+
+    @Override
+    public void onUserInteraction() {
+        super.onUserInteraction();
+        VaultLock.touch();
     }
 
     @Override
     protected void onResume() {
         super.onResume();
+        if (!VaultLock.isUnlocked()) { // backgrounded or timed out → re-lock
+            finish();
+            return;
+        }
         reload();
     }
 
     private void reload() {
-        List<String> albums = repo.allAlbums();
+        adapter.setType(currentTypeVideo);
+        List<String> albums = repo.albums(currentTypeVideo);
         adapter.submit(albums);
         boolean empty = albums.isEmpty();
         emptyView.setVisibility(empty ? View.VISIBLE : View.GONE);
@@ -237,6 +280,7 @@ public class AlbumsActivity extends AppCompatActivity implements AlbumFolderAdap
     public void onOpen(String album) {
         Intent i = new Intent(this, AlbumDetailActivity.class);
         i.putExtra(AlbumDetailActivity.EXTRA_ALBUM, album);
+        i.putExtra(AlbumDetailActivity.EXTRA_IS_VIDEO, currentTypeVideo);
         startActivity(i);
     }
 

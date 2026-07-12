@@ -27,11 +27,16 @@ public class AlbumFolderAdapter extends RecyclerView.Adapter<AlbumFolderAdapter.
     private final MediaRepository repo;
     private final AlbumMeta meta;
     private final Listener listener;
+    private boolean isVideo = true; // which media type this grid is showing
 
     public AlbumFolderAdapter(MediaRepository repo, AlbumMeta meta, Listener listener) {
         this.repo = repo;
         this.meta = meta;
         this.listener = listener;
+    }
+
+    public void setType(boolean isVideo) {
+        this.isVideo = isVideo;
     }
 
     public void submit(List<String> newAlbums) {
@@ -51,7 +56,7 @@ public class AlbumFolderAdapter extends RecyclerView.Adapter<AlbumFolderAdapter.
     @Override
     public void onBindViewHolder(@NonNull VH h, int position) {
         String album = albums.get(position);
-        List<DownloadedItem> contents = repo.listAlbumBoth(album, MediaRepository.Sort.NEWEST);
+        List<DownloadedItem> contents = repo.list(isVideo, MediaRepository.Sort.NEWEST, album);
 
         h.name.setText(album);
         h.count.setText(contents.size() + (contents.size() == 1 ? " item" : " items"));

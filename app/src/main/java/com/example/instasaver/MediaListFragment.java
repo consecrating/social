@@ -269,15 +269,18 @@ public class MediaListFragment extends Fragment implements MediaAdapter.Listener
             addSelBtn(isVideoType() ? R.string.action_move_my_reels : R.string.action_move_my_photos,
                     () -> bulkMove(MediaRepository.FAV_DIR));
             addSelBtnHold(R.string.sel_move_album, this::bulkMoveToAlbum);
+            addSelBtn(R.string.sel_to_gallery, this::bulkMoveToGallery);
             addSelBtn(R.string.sel_to_delete, () -> bulkMove(MediaRepository.TRASH_DIR));
             addSelBtn(R.string.sel_share, this::bulkShare);
             addSelBtn(R.string.sel_delete_now, this::bulkDelete);
         } else if (mode == MODE_FAVORITES) {
             addSelBtn(R.string.action_remove_fav, () -> bulkMove(MediaRepository.ALL));
+            addSelBtn(R.string.sel_to_gallery, this::bulkMoveToGallery);
             addSelBtn(R.string.sel_to_delete, () -> bulkMove(MediaRepository.TRASH_DIR));
             addSelBtn(R.string.sel_share, this::bulkShare);
             addSelBtn(R.string.sel_delete_now, this::bulkDelete);
         } else if (mode == MODE_ALBUM) {
+            addSelBtn(R.string.sel_to_gallery, this::bulkMoveToGallery);
             addSelBtn(R.string.action_remove_album, () -> bulkMove(MediaRepository.ALL));
             addSelBtn(R.string.sel_to_delete, () -> bulkMove(MediaRepository.TRASH_DIR));
             addSelBtn(R.string.sel_share, this::bulkShare);
@@ -329,8 +332,8 @@ public class MediaListFragment extends Fragment implements MediaAdapter.Listener
         selectionButtons.addView(b);
     }
 
-    /** Move-to-album is a private feature: it requires a 5-second press to arm. */
-    private static final long HOLD_MS = 5000;
+    /** Move-to-album is a private feature: it requires a 3-second press to arm. */
+    private static final long HOLD_MS = 3000;
 
     private void addSelBtnHold(int labelRes, Runnable action) {
         Button b = new Button(requireContext(),
@@ -495,6 +498,8 @@ public class MediaListFragment extends Fragment implements MediaAdapter.Listener
                     () -> { sheet.dismiss(); singleMove(item, MediaRepository.TRASH_DIR); });
             addSheetRow(root, R.string.action_rename, false, () -> { sheet.dismiss(); rename(item); });
         } else if (mode == MODE_ALBUM) {
+            addSheetRow(root, R.string.action_move_to_gallery, false,
+                    () -> { sheet.dismiss(); singleMoveToGallery(item); });
             addSheetRow(root, R.string.action_remove_album, false,
                     () -> { sheet.dismiss(); singleMove(item, MediaRepository.ALL); });
             addSheetRow(root, R.string.action_move_delete, false,
@@ -565,6 +570,22 @@ public class MediaListFragment extends Fragment implements MediaAdapter.Listener
     private void singleMove(DownloadedItem item, String album) {
         File moved = repo.moveToAlbum(item, album);
         toast(moved != null ? "Moved" : "Move failed");
+        reload();
+    }
+
+    private void singleMoveToGallery(DownloadedItem item) {
+        boolean ok = repo.moveToGallery(item);
+        toast(ok ? "Moved back to gallery" : "Couldn't move to gallery");
+        reload();
+    }
+
+    private void bulkMoveToGallery() {
+        List<DownloadedItem> sel = adapter.getSelected();
+        if (sel.isEmpty()) return;
+        int ok = 0;
+        for (DownloadedItem item : sel) if (repo.moveToGallery(item)) ok++;
+        toast(ok + " moved back to gallery");
+        adapter.clearSelection();
         reload();
     }
 

@@ -2,6 +2,8 @@ package com.example.instasaver;
 
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.GestureDetector;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
@@ -39,6 +41,10 @@ public class ViewerActivity extends AppCompatActivity {
     private ViewerAdapter adapter;
     private View topBar;
 
+    private final Handler barHandler = new Handler(Looper.getMainLooper());
+    private final Runnable hideBar = () -> topBar.setVisibility(View.GONE);
+    private static final long BAR_AUTO_HIDE_MS = 2000;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -63,7 +69,7 @@ public class ViewerActivity extends AppCompatActivity {
         findViewById(R.id.close).setOnClickListener(v -> finish());
 
         pager = findViewById(R.id.viewerPager);
-        adapter = new ViewerAdapter(paths, video);
+        adapter = new ViewerAdapter(paths, video, this::toggleBar);
         pager.setAdapter(adapter);
         pager.setCurrentItem(index, false);
         updateTopBarForType(index);
@@ -80,10 +86,34 @@ public class ViewerActivity extends AppCompatActivity {
         pager.post(() -> activate(start));
     }
 
-    /** Reels are shown distraction-free: the top bar (close) is hidden for videos. */
+    /**
+     * Reels are distraction-free (top bar always hidden). For photos the bar
+     * (close button) shows briefly then auto-hides after 2 seconds; a tap on the
+     * photo toggles it back.
+     */
     private void updateTopBarForType(int position) {
         boolean isVideo = position >= 0 && position < video.length && video[position];
-        topBar.setVisibility(isVideo ? View.GONE : View.VISIBLE);
+        if (isVideo) {
+            barHandler.removeCallbacks(hideBar);
+            topBar.setVisibility(View.GONE);
+        } else {
+            showBarAutoHide();
+        }
+    }
+
+    private void showBarAutoHide() {
+        topBar.setVisibility(View.VISIBLE);
+        barHandler.removeCallbacks(hideBar);
+        barHandler.postDelayed(hideBar, BAR_AUTO_HIDE_MS);
+    }
+
+    private void toggleBar() {
+        if (topBar.getVisibility() == View.VISIBLE) {
+            barHandler.removeCallbacks(hideBar);
+            topBar.setVisibility(View.GONE);
+        } else {
+            showBarAutoHide();
+        }
     }
 
     private void activate(int position) {
@@ -108,11 +138,13 @@ public class ViewerActivity extends AppCompatActivity {
 
         private final String[] paths;
         private final boolean[] video;
+        private final Runnable onImageTap;
         private VideoHolder active;
 
-        ViewerAdapter(String[] paths, boolean[] video) {
+        ViewerAdapter(String[] paths, boolean[] video, Runnable onImageTap) {
             this.paths = paths;
             this.video = video;
+            this.onImageTap = onImageTap;
         }
 
         @Override
@@ -127,7 +159,8 @@ public class ViewerActivity extends AppCompatActivity {
             if (viewType == T_VIDEO) {
                 return new VideoHolder(inf.inflate(R.layout.item_viewer_video, parent, false));
             }
-            return new ImageHolder(inf.inflate(R.layout.item_viewer_image, parent, false));
+            return new ImageHolder(
+                    inf.inflate(R.layout.item_viewer_image, parent, false), onImageTap);
         }
 
         @Override
@@ -168,9 +201,12 @@ public class ViewerActivity extends AppCompatActivity {
         static class ImageHolder extends RecyclerView.ViewHolder {
             final ImageView image;
 
-            ImageHolder(@NonNull View v) {
+            ImageHolder(@NonNull View v, Runnable onImageTap) {
                 super(v);
                 image = v.findViewById(R.id.image);
+                if (image instanceof ZoomableImageView) {
+                    ((ZoomableImageView) image).setOnSingleTap(onImageTap);
+                }
             }
         }
 

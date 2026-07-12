@@ -38,6 +38,11 @@ public class ZoomableImageView extends AppCompatImageView {
 
     private ScaleGestureDetector scaleDetector;
     private GestureDetector gestureDetector;
+    private Runnable onSingleTap;
+
+    public void setOnSingleTap(Runnable r) {
+        this.onSingleTap = r;
+    }
 
     public ZoomableImageView(Context context) {
         super(context);
@@ -178,6 +183,12 @@ public class ZoomableImageView extends AppCompatImageView {
     }
 
     private class GestureListener extends GestureDetector.SimpleOnGestureListener {
+        @Override
+        public boolean onSingleTapConfirmed(MotionEvent e) {
+            if (onSingleTap != null) onSingleTap.run();
+            return true;
+        }
+
         @Override
         public boolean onDoubleTap(MotionEvent e) {
             if (saveScale > 1f) {

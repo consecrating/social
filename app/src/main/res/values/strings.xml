@@ -37,6 +37,8 @@
     <string name="action_move_delete">Move to Delete bin</string>
     <string name="action_remove_fav">Remove from this collection</string>
     <string name="action_remove_album">Remove from album</string>
+    <string name="action_move_to_gallery">Move back to phone gallery</string>
+    <string name="sel_to_gallery">To gallery</string>
     <string name="action_restore">Restore to library</string>
 
     <!-- selection mode -->
