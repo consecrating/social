@@ -90,13 +90,18 @@ public class MainActivity extends AppCompatActivity {
 
         executor.execute(() -> {
             try {
-                final InstagramExtractor.Media media = InstagramExtractor.resolve(raw);
+                final java.util.List<InstagramExtractor.Media> items =
+                        InstagramExtractor.resolveAll(raw);
                 final String shortcode = InstagramExtractor.extractShortcode(raw);
                 main.post(() -> {
-                    enqueueDownload(media, shortcode);
-                    setBusy(false, media.isVideo
-                            ? "Downloading video to your Downloads folder…"
-                            : "Downloading photo to your Downloads folder…");
+                    int index = 1;
+                    for (InstagramExtractor.Media media : items) {
+                        enqueueDownload(media, shortcode, index++);
+                    }
+                    int count = items.size();
+                    setBusy(false, count == 1
+                            ? "Downloading to your Downloads folder…"
+                            : "Downloading " + count + " items to your Downloads folder…");
                 });
             } catch (final Exception e) {
                 main.post(() -> setBusy(false, "Error: " + e.getMessage()));
@@ -104,12 +109,12 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-    private void enqueueDownload(InstagramExtractor.Media media, String shortcode) {
+    private void enqueueDownload(InstagramExtractor.Media media, String shortcode, int index) {
         try {
             String ext = media.isVideo ? ".mp4" : ".jpg";
-            String name = "instasaver_"
-                    + (shortcode != null ? shortcode : String.valueOf(System.currentTimeMillis()))
-                    + ext;
+            String base = "instasaver_"
+                    + (shortcode != null ? shortcode : String.valueOf(System.currentTimeMillis()));
+            String name = (index > 1 ? base + "_" + index : base) + ext;
 
             DownloadManager.Request request =
                     new DownloadManager.Request(Uri.parse(media.url));

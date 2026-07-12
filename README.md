@@ -24,23 +24,32 @@ Videos/reels are saved as `.mp4` and photos as `.jpg` in your phone's **Download
 
 ## How it works
 
-For a given post URL the app fetches the public post page and reads the Open Graph
-meta tags Instagram embeds in the page:
+Instagram no longer serves Open Graph (`og:video`/`og:image`) tags to logged-out
+requests — the post page now redirects to a login wall. So the app talks to
+Instagram's web API the same way the website's own JavaScript does:
 
-- `og:video` -> the reel/video `.mp4`
-- `og:image` -> the photo `.jpg`
+1. Load `instagram.com` once to obtain a `csrftoken` cookie.
+2. Call the GraphQL endpoint for the post (by its shortcode) with the
+   `X-IG-App-ID` header + CSRF token. This is what bypasses the login wall.
+3. Parse `xdt_shortcode_media` for `video_url` / `display_url`, including
+   carousel children.
 
+If that fails it falls back to the legacy `og:` tag scrape. All extraction logic
+is isolated in
+[`InstagramExtractor.java`](app/src/main/java/com/example/instasaver/InstagramExtractor.java).
 The direct media URL is then handed to Android's built-in `DownloadManager`.
-All extraction logic is isolated in
-[`InstagramExtractor.java`](app/src/main/java/com/example/instasaver/InstagramExtractor.java)
-so it is easy to update if Instagram changes its page markup.
 
-## Limitations
+## Limitations (please read)
 
-- **Public content only.** Private/login-gated posts do not expose the media tags.
-- **Carousels** (multi-item posts) currently download the first item only.
-- Instagram changes its markup periodically; if extraction breaks, update the
-  parser in `InstagramExtractor.java`.
+- **Public content only.** Private/age-restricted/login-only posts won't work.
+- **Instagram actively blocks scraping.** From datacenter/VPN IPs you'll often get
+  a `401 "Please wait a few minutes"` rate-limit. On a normal phone (mobile/Wi-Fi
+  IP) it works far more reliably. If you get a rate-limit, wait a minute or toggle
+  between Wi-Fi and mobile data.
+- **`doc_id` values rotate.** Instagram periodically changes the GraphQL `doc_id`s;
+  if every request starts failing, update the `DOC_IDS` array in
+  `InstagramExtractor.java`.
+- **Carousels** (multi-item posts) are supported — all items download.
 - The bundled APK is **debug-signed** (fine for personal use).
 
 ## Building from source
