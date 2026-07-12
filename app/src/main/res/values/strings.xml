@@ -21,7 +21,8 @@
     <string name="empty_delete">Delete bin is empty.\nMove items here, then delete them for good.</string>
 
     <string name="actions">Actions</string>
-    <string name="action_open">Open</string>
+    <string name="viewer_close">Close</string>
+    <string name="action_open">Open in another app</string>
     <string name="action_share">Share</string>
     <string name="action_save_gallery">Save to phone gallery</string>
     <string name="action_move">Move to album</string>

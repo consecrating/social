@@ -46,6 +46,11 @@ public class MediaAdapter extends RecyclerView.Adapter<MediaAdapter.VH> {
         return selectionMode;
     }
 
+    /** The items currently displayed, in display order. */
+    public List<DownloadedItem> getItems() {
+        return new ArrayList<>(items);
+    }
+
     public List<DownloadedItem> getSelected() {
         List<DownloadedItem> out = new ArrayList<>();
         for (DownloadedItem i : items) {

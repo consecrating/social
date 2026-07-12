@@ -359,6 +359,30 @@ public class MediaListFragment extends Fragment implements MediaAdapter.Listener
 
     @Override
     public void onOpen(DownloadedItem item) {
+        // Open the in-app viewer at the tapped item, scoped to the list on screen,
+        // so the user can swipe to the next/previous photo or reel.
+        List<DownloadedItem> current = adapter.getItems();
+        if (current.isEmpty()) return;
+
+        String[] paths = new String[current.size()];
+        boolean[] video = new boolean[current.size()];
+        int index = 0;
+        for (int i = 0; i < current.size(); i++) {
+            DownloadedItem it = current.get(i);
+            paths[i] = it.file.getAbsolutePath();
+            video[i] = it.isVideo;
+            if (it.file.equals(item.file)) index = i;
+        }
+
+        Intent i = new Intent(requireContext(), ViewerActivity.class);
+        i.putExtra(ViewerActivity.EXTRA_PATHS, paths);
+        i.putExtra(ViewerActivity.EXTRA_VIDEO, video);
+        i.putExtra(ViewerActivity.EXTRA_INDEX, index);
+        startActivity(i);
+    }
+
+    /** Hand the file to another installed app (kept as an action-sheet option). */
+    private void openExternal(DownloadedItem item) {
         try {
             Uri uri = FileProvider.getUriForFile(requireContext(),
                     MediaRepository.authority(requireContext()), item.file);
@@ -387,7 +411,7 @@ public class MediaListFragment extends Fragment implements MediaAdapter.Listener
         header.setTypeface(header.getTypeface(), android.graphics.Typeface.BOLD);
         root.addView(header);
 
-        addSheetRow(root, R.string.action_open, false, () -> { sheet.dismiss(); onOpen(item); });
+        addSheetRow(root, R.string.action_open, false, () -> { sheet.dismiss(); openExternal(item); });
         addSheetRow(root, R.string.action_share, false, () -> { sheet.dismiss(); shareOne(item); });
         addSheetRow(root, R.string.action_save_gallery, false, () -> { sheet.dismiss(); saveToGallery(item); });
 

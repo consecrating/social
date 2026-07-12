@@ -29,7 +29,10 @@ Install:
   - **Albums** — group library items into folders; filter each tab by album.
   - **Sort** — Newest, Oldest, Name, or Largest.
   - **Rename**, **Move to album**, move to collections, or move to the Delete bin.
-- **Open / Play** an item in your favorite player or viewer.
+- **Built-in swipeable viewer** — tap any item to open a full-screen viewer, then
+  swipe left/right to move through the next/previous photos and reels. Videos play
+  with standard controls (only the visible one plays); use the ⋮ menu's
+  "Open in another app" to hand a file to an external player instead.
 - **Share** one or many items to other apps.
 - **Save to phone gallery** — export a copy into your system Photos/Gallery.
 - **Carousels** — multi-item posts download every photo/video.

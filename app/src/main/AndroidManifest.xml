@@ -30,6 +30,11 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".ViewerActivity"
+            android:exported="false"
+            android:theme="@style/Theme.InstaSaver" />
+
         <!-- FileProvider so we can open/share downloaded files with other apps -->
         <provider
             android:name="androidx.core.content.FileProvider"
