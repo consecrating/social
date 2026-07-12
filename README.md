@@ -45,6 +45,10 @@ Install:
   tabs. Renaming/deleting albums is available from a folder's menu.
 - **Private "Move to album"** — because albums are private, the Move-to-album
   action must be **pressed and held for 5 seconds** to unlock.
+- **Import from gallery into the vault** — tap the **+** in the vault to pick
+  photos/videos from your phone gallery and copy them into a hidden album. Choose
+  **Move** to also remove the originals from the gallery (best-effort; some items
+  may need manual deletion), or **Copy** to keep them.
 - **Share** one or many items to other apps.
 - **Save to phone gallery** — export a copy into your system Photos/Gallery.
 - **Carousels** — multi-item posts download every photo/video.
