@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">InstaSaver</string>
+    <string name="hint_url">Paste Instagram post or reel link</string>
+    <string name="download">Download</string>
+    <string name="paste">Paste</string>
+    <string name="disclaimer">Only download media you own or have permission to use.</string>
+</resources>

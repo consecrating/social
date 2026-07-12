@@ -1,0 +1,11 @@
+# Android / Gradle build outputs
+build/
+.gradle/
+local.properties
+*.iml
+.idea/
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Keep the prebuilt release APK (InstaSaver.apk) tracked for easy download.
