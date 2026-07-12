@@ -19,6 +19,9 @@
     <string name="empty_my_reels">No reels here yet.\nSelect reels and move them to \"My Reels\".</string>
     <string name="empty_my_photos">No photos here yet.\nSelect photos and move them to \"My Photos\".</string>
     <string name="empty_delete">Delete bin is empty.\nMove items here, then delete them for good.</string>
+    <string name="empty_album">No albums yet.\nSelect items in Reels or Photos and choose \"Move to album\".</string>
+
+    <string name="albums_title">Albums (hidden)</string>
 
     <string name="actions">Actions</string>
     <string name="viewer_close">Close</string>
@@ -32,6 +35,7 @@
     <string name="action_move_my_photos">Move to My Photos</string>
     <string name="action_move_delete">Move to Delete bin</string>
     <string name="action_remove_fav">Remove from this collection</string>
+    <string name="action_remove_album">Remove from album</string>
     <string name="action_restore">Restore to library</string>
 
     <!-- selection mode -->

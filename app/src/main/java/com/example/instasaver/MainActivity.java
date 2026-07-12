@@ -3,6 +3,7 @@ package com.example.instasaver;
 import android.content.Intent;
 import android.os.Bundle;
 import android.text.TextUtils;
+import android.view.View;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.lifecycle.ViewModelProvider;
@@ -37,6 +38,15 @@ public class MainActivity extends AppCompatActivity {
                 default: tab.setText(R.string.tab_delete); break;
             }
         }).attach();
+
+        // Hidden gesture: long-press the title to open the private Albums vault.
+        View title = findViewById(R.id.appTitle);
+        if (title != null) {
+            title.setOnLongClickListener(v -> {
+                startActivity(new Intent(this, AlbumsActivity.class));
+                return true;
+            });
+        }
 
         handleShareIntent(getIntent());
     }

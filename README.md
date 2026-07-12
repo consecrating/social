@@ -26,7 +26,9 @@ Install:
   delete many items at once (with Select all / Cancel).
 - **Built-in gallery** — thumbnail grid of everything, with a play badge on videos.
 - **Organize your downloads:**
-  - **Albums** — group library items into folders; filter each tab by album.
+  - **Hidden Albums vault** — file items into custom albums that are kept **out of
+    the main Reels/Photos view**. Open the vault by **long-pressing the "InstaSaver"
+    title** on the home screen. Great for keeping some items private/tucked away.
   - **Sort** — Newest, Oldest, Name, or Largest.
   - **Rename**, **Move to album**, move to collections, or move to the Delete bin.
 - **Built-in swipeable viewer** — tap any item to open a full-screen viewer, then

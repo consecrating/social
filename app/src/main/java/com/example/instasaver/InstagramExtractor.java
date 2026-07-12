@@ -8,6 +8,7 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.math.BigInteger;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
@@ -106,34 +107,34 @@ public class InstagramExtractor {
             throw new IOException("That doesn't look like an Instagram post or reel link.");
         }
 
-        // Primary path: the web GraphQL API.
+        IOException firstError = null;
+
+        // 1) The web GraphQL API (what instagram.com's own JS uses).
         try {
-            List<Media> viaApi = resolveViaApi(shortcode);
-            if (!viaApi.isEmpty()) {
-                return viaApi;
-            }
-        } catch (IOException apiError) {
-            // Fall through to the legacy scrape below, but remember the reason.
-            try {
-                List<Media> viaOg = resolveViaOgTags(shortcode);
-                if (!viaOg.isEmpty()) {
-                    return viaOg;
-                }
-            } catch (IOException ignored) {
-                // ignore, throw the more informative API error
-            }
-            throw new IOException(friendly(apiError.getMessage()));
+            List<Media> r = resolveViaApi(shortcode);
+            if (!r.isEmpty()) return r;
+        } catch (IOException e) {
+            firstError = e;
         }
 
-        // API returned nothing usable — try legacy tags as a last resort.
-        List<Media> viaOg = resolveViaOgTags(shortcode);
-        if (!viaOg.isEmpty()) {
-            return viaOg;
+        // 2) The private mobile-web media info endpoint (different shape, often
+        //    succeeds when GraphQL doc_ids are stale). Needs the numeric media id.
+        try {
+            List<Media> r = resolveViaMediaInfo(shortcode);
+            if (!r.isEmpty()) return r;
+        } catch (IOException e) {
+            if (firstError == null) firstError = e;
         }
 
-        throw new IOException(
-                "Couldn't find downloadable media. The post may be private, "
-                        + "age-restricted, or login-only.");
+        // 3) Legacy Open Graph tag scrape (rarely works now, but cheap to try).
+        try {
+            List<Media> r = resolveViaOgTags(shortcode);
+            if (!r.isEmpty()) return r;
+        } catch (IOException ignored) {
+            // fall through
+        }
+
+        throw new IOException(friendly(firstError != null ? firstError.getMessage() : null));
     }
 
     // ---------------------------------------------------------------------
@@ -273,6 +274,92 @@ public class InstagramExtractor {
     }
 
     // ---------------------------------------------------------------------
+    // Fallback: private mobile-web media info endpoint
+    // ---------------------------------------------------------------------
+
+    private static List<Media> resolveViaMediaInfo(String shortcode) throws IOException {
+        String mediaId = shortcodeToMediaId(shortcode);
+        if (mediaId == null) return new ArrayList<>();
+
+        HttpURLConnection conn = null;
+        try {
+            conn = open("https://www.instagram.com/api/v1/media/" + mediaId + "/info/");
+            conn.setRequestProperty("X-IG-App-ID", IG_APP_ID);
+            conn.setRequestProperty("Accept", "*/*");
+            conn.setRequestProperty("Referer",
+                    "https://www.instagram.com/p/" + shortcode + "/");
+            conn.setInstanceFollowRedirects(true);
+
+            int code = conn.getResponseCode();
+            if (code != 200) {
+                throw new IOException("HTTP " + code);
+            }
+            return parseMediaInfo(readBody(conn.getInputStream()));
+        } finally {
+            if (conn != null) conn.disconnect();
+        }
+    }
+
+    private static List<Media> parseMediaInfo(String json) throws IOException {
+        List<Media> out = new ArrayList<>();
+        try {
+            JSONObject root = new JSONObject(json);
+            JSONArray items = root.optJSONArray("items");
+            if (items == null || items.length() == 0) return out;
+            JSONObject item = items.getJSONObject(0);
+
+            JSONArray carousel = item.optJSONArray("carousel_media");
+            if (carousel != null) {
+                for (int i = 0; i < carousel.length(); i++) {
+                    addMediaInfoNode(carousel.getJSONObject(i), out);
+                }
+                if (!out.isEmpty()) return out;
+            }
+            addMediaInfoNode(item, out);
+        } catch (Exception e) {
+            throw new IOException("Unexpected response from Instagram.");
+        }
+        return out;
+    }
+
+    private static void addMediaInfoNode(JSONObject node, List<Media> out) {
+        // video_versions -> pick the first (highest quality); else image_versions2.
+        JSONArray videos = node.optJSONArray("video_versions");
+        if (videos != null && videos.length() > 0) {
+            String url = videos.optJSONObject(0).optString("url", null);
+            if (url != null && !url.isEmpty()) {
+                out.add(new Media(url, true));
+                return;
+            }
+        }
+        JSONObject iv2 = node.optJSONObject("image_versions2");
+        if (iv2 != null) {
+            JSONArray candidates = iv2.optJSONArray("candidates");
+            if (candidates != null && candidates.length() > 0) {
+                String url = candidates.optJSONObject(0).optString("url", null);
+                if (url != null && !url.isEmpty()) {
+                    out.add(new Media(url, false));
+                }
+            }
+        }
+    }
+
+    /** Instagram shortcodes are base64 (custom alphabet) of the numeric media id. */
+    static String shortcodeToMediaId(String shortcode) {
+        if (shortcode == null || shortcode.isEmpty()) return null;
+        final String alphabet =
+                "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+        BigInteger base = BigInteger.valueOf(64);
+        BigInteger id = BigInteger.ZERO;
+        for (int i = 0; i < shortcode.length(); i++) {
+            int val = alphabet.indexOf(shortcode.charAt(i));
+            if (val < 0) return null; // unexpected char
+            id = id.multiply(base).add(BigInteger.valueOf(val));
+        }
+        return id.toString();
+    }
+
+    // ---------------------------------------------------------------------
     // Fallback: legacy Open Graph tag scrape
     // ---------------------------------------------------------------------
 
@@ -334,8 +421,9 @@ public class InstagramExtractor {
             return "Instagram temporarily blocked the request (rate limit). "
                     + "Wait a minute and try again, or switch between Wi-Fi and mobile data.";
         }
-        return "Couldn't fetch this post. It may be private, age-restricted, "
-                + "or Instagram changed its API. (" + raw + ")";
+        return "Couldn't find downloadable media. The post may be private, "
+                + "age-restricted, or login-only. If it's public, wait a minute "
+                + "and try again (Instagram rate-limits repeated requests).";
     }
 
     /** Instagram HTML-escapes ampersands in URLs; undo the common cases. */

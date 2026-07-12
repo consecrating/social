@@ -49,6 +49,7 @@ public class MediaListFragment extends Fragment implements MediaAdapter.Listener
     static final int MODE_LIBRARY = 0;
     static final int MODE_FAVORITES = 1;
     static final int MODE_TRASH = 2;
+    static final int MODE_ALBUM = 3;
 
     static final int TYPE_VIDEO = 0;
     static final int TYPE_PHOTO = 1;
@@ -56,6 +57,7 @@ public class MediaListFragment extends Fragment implements MediaAdapter.Listener
 
     private int mode;
     private int type;
+    private String currentAlbum; // used only in MODE_ALBUM
 
     private MediaRepository repo;
     private MediaAdapter adapter;
@@ -85,6 +87,10 @@ public class MediaListFragment extends Fragment implements MediaAdapter.Listener
 
     public static MediaListFragment trash() {
         return build(MODE_TRASH, TYPE_BOTH);
+    }
+
+    public static MediaListFragment album() {
+        return build(MODE_ALBUM, TYPE_BOTH);
     }
 
     private static MediaListFragment build(int mode, int type) {
@@ -133,13 +139,14 @@ public class MediaListFragment extends Fragment implements MediaAdapter.Listener
 
         setupSortSpinner();
 
-        // Albums only make sense in the main library.
-        albumSpinner.setVisibility(mode == MODE_LIBRARY ? View.VISIBLE : View.GONE);
+        // The album picker is only shown inside the hidden vault (ALBUM mode).
+        albumSpinner.setVisibility(mode == MODE_ALBUM ? View.VISIBLE : View.GONE);
 
         emptyView.setText(emptyMessage());
     }
 
     private int emptyMessage() {
+        if (mode == MODE_ALBUM) return R.string.empty_album;
         if (mode == MODE_TRASH) return R.string.empty_delete;
         if (mode == MODE_FAVORITES) {
             return isVideoType() ? R.string.empty_my_reels : R.string.empty_my_photos;
@@ -170,12 +177,19 @@ public class MediaListFragment extends Fragment implements MediaAdapter.Listener
     }
 
     private void refreshAlbumSpinner() {
-        if (mode != MODE_LIBRARY) return;
-        List<String> albums = new ArrayList<>();
-        albums.add(MediaRepository.ALL);
-        albums.addAll(repo.albums(isVideoType()));
+        if (mode != MODE_ALBUM) return;
 
-        int keep = albums.indexOf(albumFilter);
+        final List<String> albums = repo.allAlbums();
+        if (albums.isEmpty()) {
+            albumSpinner.setAdapter(null);
+            currentAlbum = null;
+            return;
+        }
+        if (currentAlbum == null || !albums.contains(currentAlbum)) {
+            currentAlbum = albums.get(0);
+        }
+        int keep = albums.indexOf(currentAlbum);
+
         ArrayAdapter<String> aa = new ArrayAdapter<>(requireContext(),
                 android.R.layout.simple_spinner_dropdown_item, albums);
         albumSpinner.setAdapter(aa);
@@ -184,7 +198,7 @@ public class MediaListFragment extends Fragment implements MediaAdapter.Listener
         albumSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int pos, long id) {
-                albumFilter = (String) parent.getItemAtPosition(pos);
+                currentAlbum = (String) parent.getItemAtPosition(pos);
                 reloadItemsOnly();
             }
 
@@ -208,6 +222,10 @@ public class MediaListFragment extends Fragment implements MediaAdapter.Listener
                 break;
             case MODE_TRASH:
                 items = repo.listTrashBoth(sort);
+                break;
+            case MODE_ALBUM:
+                items = currentAlbum == null
+                        ? new ArrayList<>() : repo.listAlbumBoth(currentAlbum, sort);
                 break;
             case MODE_LIBRARY:
             default:
@@ -270,6 +288,7 @@ public class MediaListFragment extends Fragment implements MediaAdapter.Listener
         if (mode == MODE_LIBRARY) {
             addSelBtn(isVideoType() ? R.string.action_move_my_reels : R.string.action_move_my_photos,
                     () -> bulkMove(MediaRepository.FAV_DIR));
+            addSelBtn(R.string.sel_move_album, this::bulkMoveToAlbum);
             addSelBtn(R.string.sel_to_delete, () -> bulkMove(MediaRepository.TRASH_DIR));
             addSelBtn(R.string.sel_share, this::bulkShare);
             addSelBtn(R.string.sel_delete_now, this::bulkDelete);
@@ -278,11 +297,45 @@ public class MediaListFragment extends Fragment implements MediaAdapter.Listener
             addSelBtn(R.string.sel_to_delete, () -> bulkMove(MediaRepository.TRASH_DIR));
             addSelBtn(R.string.sel_share, this::bulkShare);
             addSelBtn(R.string.sel_delete_now, this::bulkDelete);
+        } else if (mode == MODE_ALBUM) {
+            addSelBtn(R.string.action_remove_album, () -> bulkMove(MediaRepository.ALL));
+            addSelBtn(R.string.sel_to_delete, () -> bulkMove(MediaRepository.TRASH_DIR));
+            addSelBtn(R.string.sel_share, this::bulkShare);
+            addSelBtn(R.string.sel_delete_now, this::bulkDelete);
         } else { // TRASH
             addSelBtn(R.string.sel_restore, () -> bulkMove(MediaRepository.ALL));
             addSelBtn(R.string.sel_share, this::bulkShare);
             addSelBtn(R.string.sel_delete_now, this::bulkDelete);
         }
+    }
+
+    /** Move all selected library items into a chosen (or new) album. */
+    private void bulkMoveToAlbum() {
+        final List<DownloadedItem> sel = adapter.getSelected();
+        if (sel.isEmpty()) return;
+        List<String> options = new ArrayList<>(repo.albums(isVideoType()));
+        options.add("New album…");
+        final CharSequence[] arr = options.toArray(new CharSequence[0]);
+        new AlertDialog.Builder(requireContext())
+                .setTitle("Move " + sel.size() + " to album")
+                .setItems(arr, (dialog, which) -> {
+                    if (which == options.size() - 1) {
+                        final EditText input = new EditText(requireContext());
+                        input.setHint("Album name");
+                        new AlertDialog.Builder(requireContext())
+                                .setTitle("New album")
+                                .setView(input)
+                                .setPositiveButton("Create", (d, w) -> {
+                                    String name = input.getText().toString().trim();
+                                    if (!name.isEmpty()) bulkMove(name);
+                                })
+                                .setNegativeButton("Cancel", null)
+                                .show();
+                    } else {
+                        bulkMove(options.get(which));
+                    }
+                })
+                .show();
     }
 
     private void addSelBtn(int labelRes, Runnable action) {
@@ -424,6 +477,12 @@ public class MediaListFragment extends Fragment implements MediaAdapter.Listener
             addSheetRow(root, R.string.action_rename, false, () -> { sheet.dismiss(); rename(item); });
         } else if (mode == MODE_FAVORITES) {
             addSheetRow(root, R.string.action_remove_fav, false,
+                    () -> { sheet.dismiss(); singleMove(item, MediaRepository.ALL); });
+            addSheetRow(root, R.string.action_move_delete, false,
+                    () -> { sheet.dismiss(); singleMove(item, MediaRepository.TRASH_DIR); });
+            addSheetRow(root, R.string.action_rename, false, () -> { sheet.dismiss(); rename(item); });
+        } else if (mode == MODE_ALBUM) {
+            addSheetRow(root, R.string.action_remove_album, false,
                     () -> { sheet.dismiss(); singleMove(item, MediaRepository.ALL); });
             addSheetRow(root, R.string.action_move_delete, false,
                     () -> { sheet.dismiss(); singleMove(item, MediaRepository.TRASH_DIR); });

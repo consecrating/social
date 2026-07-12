@@ -87,18 +87,34 @@ public class MediaRepository {
         if (root == null || !root.exists()) return items;
 
         if (albumFilter == null || ALL.equals(albumFilter)) {
+            // Main library shows only unorganized (root-level) files. Anything the
+            // user has filed into a custom album lives in the hidden vault instead.
             collect(root, isVideo, null, items);
-            File[] dirs = root.listFiles(File::isDirectory);
-            if (dirs != null) {
-                for (File d : dirs) {
-                    if (!isReserved(d.getName())) collect(d, isVideo, d.getName(), items);
-                }
-            }
         } else {
             File dir = new File(root, sanitize(albumFilter));
             collect(dir, isVideo, albumFilter, items);
         }
 
+        sortItems(items, sort);
+        return items;
+    }
+
+    /** Union of album (subfolder) names across both media types, sorted. */
+    public List<String> allAlbums() {
+        Set<String> names = new java.util.TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+        names.addAll(albums(true));
+        names.addAll(albums(false));
+        return new ArrayList<>(names);
+    }
+
+    /** List a custom album's contents across BOTH media types (for the vault). */
+    public List<DownloadedItem> listAlbumBoth(String album, Sort sort) {
+        List<DownloadedItem> items = new ArrayList<>();
+        if (album == null || album.isEmpty() || isReserved(album)) return items;
+        File videoRoot = root(true);
+        File photoRoot = root(false);
+        if (videoRoot != null) collect(new File(videoRoot, sanitize(album)), true, album, items);
+        if (photoRoot != null) collect(new File(photoRoot, sanitize(album)), false, album, items);
         sortItems(items, sort);
         return items;
     }
