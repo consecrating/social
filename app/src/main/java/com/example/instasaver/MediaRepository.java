@@ -200,6 +200,49 @@ public class MediaRepository {
         return item.file.renameTo(target) ? target : null;
     }
 
+    /** Rename an album folder under both media roots. */
+    public boolean renameAlbum(String from, String to) {
+        String cleanTo = sanitize(to);
+        if (cleanTo.isEmpty() || isReserved(cleanTo)) return false;
+        boolean any = false;
+        for (boolean isVideo : new boolean[]{true, false}) {
+            File root = root(isVideo);
+            if (root == null) continue;
+            File src = new File(root, sanitize(from));
+            if (!src.isDirectory()) continue;
+            File dst = new File(root, cleanTo);
+            if (dst.exists()) {
+                // merge: move each file over
+                File[] files = src.listFiles();
+                if (files != null) {
+                    for (File f : files) f.renameTo(new File(dst, f.getName()));
+                }
+                src.delete();
+                any = true;
+            } else {
+                any |= src.renameTo(dst);
+            }
+        }
+        return any;
+    }
+
+    /** Permanently delete an album folder and its files under both media roots. */
+    public boolean deleteAlbum(String album) {
+        if (album == null || isReserved(album)) return false;
+        boolean any = false;
+        for (boolean isVideo : new boolean[]{true, false}) {
+            File root = root(isVideo);
+            if (root == null) continue;
+            File dir = new File(root, sanitize(album));
+            if (dir.isDirectory()) {
+                File[] files = dir.listFiles();
+                if (files != null) for (File f : files) f.delete();
+                any |= dir.delete();
+            }
+        }
+        return any;
+    }
+
     /** Move a file into an album subfolder ("All" moves it back to the root). */
     public File moveToAlbum(DownloadedItem item, String album) {
         File dir = ensureDir(item.isVideo, album);

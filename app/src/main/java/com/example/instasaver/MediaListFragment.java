@@ -1,5 +1,6 @@
 package com.example.instasaver;
 
+import android.annotation.SuppressLint;
 import android.app.DownloadManager;
 import android.content.BroadcastReceiver;
 import android.content.Context;
@@ -8,8 +9,10 @@ import android.content.IntentFilter;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
-import android.view.Gravity;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.LayoutInflater;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
@@ -45,6 +48,7 @@ public class MediaListFragment extends Fragment implements MediaAdapter.Listener
 
     private static final String ARG_MODE = "mode";
     private static final String ARG_TYPE = "type";
+    private static final String ARG_ALBUM = "album";
 
     static final int MODE_LIBRARY = 0;
     static final int MODE_FAVORITES = 1;
@@ -57,7 +61,7 @@ public class MediaListFragment extends Fragment implements MediaAdapter.Listener
 
     private int mode;
     private int type;
-    private String currentAlbum; // used only in MODE_ALBUM
+    private String fixedAlbum; // used only in MODE_ALBUM
 
     private MediaRepository repo;
     private MediaAdapter adapter;
@@ -89,8 +93,10 @@ public class MediaListFragment extends Fragment implements MediaAdapter.Listener
         return build(MODE_TRASH, TYPE_BOTH);
     }
 
-    public static MediaListFragment album() {
-        return build(MODE_ALBUM, TYPE_BOTH);
+    public static MediaListFragment albumTyped(String album, boolean isVideo) {
+        MediaListFragment f = build(MODE_ALBUM, isVideo ? TYPE_VIDEO : TYPE_PHOTO);
+        f.getArguments().putString(ARG_ALBUM, album);
+        return f;
     }
 
     private static MediaListFragment build(int mode, int type) {
@@ -117,6 +123,7 @@ public class MediaListFragment extends Fragment implements MediaAdapter.Listener
     public void onViewCreated(@NonNull View v, @Nullable Bundle savedInstanceState) {
         mode = getArguments() != null ? getArguments().getInt(ARG_MODE) : MODE_LIBRARY;
         type = getArguments() != null ? getArguments().getInt(ARG_TYPE) : TYPE_VIDEO;
+        fixedAlbum = getArguments() != null ? getArguments().getString(ARG_ALBUM) : null;
         repo = new MediaRepository(requireContext());
 
         recycler = v.findViewById(R.id.recycler);
@@ -139,8 +146,9 @@ public class MediaListFragment extends Fragment implements MediaAdapter.Listener
 
         setupSortSpinner();
 
-        // The album picker is only shown inside the hidden vault (ALBUM mode).
-        albumSpinner.setVisibility(mode == MODE_ALBUM ? View.VISIBLE : View.GONE);
+        // Album navigation now happens via folders in the vault, so the in-list
+        // album picker is no longer shown anywhere.
+        albumSpinner.setVisibility(View.GONE);
 
         emptyView.setText(emptyMessage());
     }
@@ -176,40 +184,8 @@ public class MediaListFragment extends Fragment implements MediaAdapter.Listener
         });
     }
 
-    private void refreshAlbumSpinner() {
-        if (mode != MODE_ALBUM) return;
-
-        final List<String> albums = repo.allAlbums();
-        if (albums.isEmpty()) {
-            albumSpinner.setAdapter(null);
-            currentAlbum = null;
-            return;
-        }
-        if (currentAlbum == null || !albums.contains(currentAlbum)) {
-            currentAlbum = albums.get(0);
-        }
-        int keep = albums.indexOf(currentAlbum);
-
-        ArrayAdapter<String> aa = new ArrayAdapter<>(requireContext(),
-                android.R.layout.simple_spinner_dropdown_item, albums);
-        albumSpinner.setAdapter(aa);
-        albumSpinner.setSelection(keep >= 0 ? keep : 0);
-
-        albumSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-            @Override
-            public void onItemSelected(AdapterView<?> parent, View view, int pos, long id) {
-                currentAlbum = (String) parent.getItemAtPosition(pos);
-                reloadItemsOnly();
-            }
-
-            @Override
-            public void onNothingSelected(AdapterView<?> parent) { }
-        });
-    }
-
     private void reload() {
         if (!isAdded()) return;
-        refreshAlbumSpinner();
         reloadItemsOnly();
     }
 
@@ -224,8 +200,8 @@ public class MediaListFragment extends Fragment implements MediaAdapter.Listener
                 items = repo.listTrashBoth(sort);
                 break;
             case MODE_ALBUM:
-                items = currentAlbum == null
-                        ? new ArrayList<>() : repo.listAlbumBoth(currentAlbum, sort);
+                items = fixedAlbum == null
+                        ? new ArrayList<>() : repo.list(isVideoType(), sort, fixedAlbum);
                 break;
             case MODE_LIBRARY:
             default:
@@ -288,7 +264,7 @@ public class MediaListFragment extends Fragment implements MediaAdapter.Listener
         if (mode == MODE_LIBRARY) {
             addSelBtn(isVideoType() ? R.string.action_move_my_reels : R.string.action_move_my_photos,
                     () -> bulkMove(MediaRepository.FAV_DIR));
-            addSelBtn(R.string.sel_move_album, this::bulkMoveToAlbum);
+            addSelBtnHold(R.string.sel_move_album, this::bulkMoveToAlbum);
             addSelBtn(R.string.sel_to_delete, () -> bulkMove(MediaRepository.TRASH_DIR));
             addSelBtn(R.string.sel_share, this::bulkShare);
             addSelBtn(R.string.sel_delete_now, this::bulkDelete);
@@ -347,6 +323,40 @@ public class MediaListFragment extends Fragment implements MediaAdapter.Listener
         b.setAllCaps(false);
         b.setOnClickListener(x -> action.run());
         selectionButtons.addView(b);
+    }
+
+    /** Move-to-album is a private feature: it requires a 5-second press to arm. */
+    private static final long HOLD_MS = 5000;
+
+    private void addSelBtnHold(int labelRes, Runnable action) {
+        Button b = new Button(requireContext(),
+                null, android.R.attr.borderlessButtonStyle);
+        b.setText(getString(labelRes) + " (hold 5s)");
+        b.setTextColor(getResources().getColor(R.color.white));
+        b.setTextSize(12f);
+        b.setAllCaps(false);
+        attachHold(b, action);
+        selectionButtons.addView(b);
+    }
+
+    @SuppressLint("ClickableViewAccessibility")
+    private void attachHold(View v, Runnable action) {
+        final Handler handler = new Handler(Looper.getMainLooper());
+        final Runnable fire = () -> action.run();
+        v.setOnTouchListener((view, ev) -> {
+            switch (ev.getActionMasked()) {
+                case MotionEvent.ACTION_DOWN:
+                    toast("Keep holding to unlock…");
+                    handler.postDelayed(fire, HOLD_MS);
+                    return true;
+                case MotionEvent.ACTION_UP:
+                case MotionEvent.ACTION_CANCEL:
+                    handler.removeCallbacks(fire);
+                    return true;
+                default:
+                    return false;
+            }
+        });
     }
 
     private void bulkMove(String targetAlbum) {
@@ -469,7 +479,7 @@ public class MediaListFragment extends Fragment implements MediaAdapter.Listener
         addSheetRow(root, R.string.action_save_gallery, false, () -> { sheet.dismiss(); saveToGallery(item); });
 
         if (mode == MODE_LIBRARY) {
-            addSheetRow(root, R.string.action_move, false, () -> { sheet.dismiss(); moveToAlbum(item); });
+            addSheetRowHold(root, R.string.action_move, () -> { sheet.dismiss(); moveToAlbum(item); });
             addSheetRow(root, isVideoType() ? R.string.action_move_my_reels : R.string.action_move_my_photos,
                     false, () -> { sheet.dismiss(); singleMove(item, MediaRepository.FAV_DIR); });
             addSheetRow(root, R.string.action_move_delete, false,
@@ -511,6 +521,22 @@ public class MediaListFragment extends Fragment implements MediaAdapter.Listener
                 android.R.attr.selectableItemBackground, tv, true);
         row.setBackgroundResource(tv.resourceId);
         row.setOnClickListener(x -> action.run());
+        parent.addView(row);
+    }
+
+    /** A private action row that only fires after a 5-second press. */
+    private void addSheetRowHold(LinearLayout parent, int labelRes, Runnable action) {
+        TextView row = new TextView(requireContext());
+        row.setText(getString(labelRes) + "  (hold 5s to unlock)");
+        row.setTextSize(15f);
+        row.setPadding(dp(16), dp(16), dp(16), dp(16));
+        row.setClickable(true);
+        row.setFocusable(true);
+        android.util.TypedValue tv = new android.util.TypedValue();
+        requireContext().getTheme().resolveAttribute(
+                android.R.attr.selectableItemBackground, tv, true);
+        row.setBackgroundResource(tv.resourceId);
+        attachHold(row, action);
         parent.addView(row);
     }
 

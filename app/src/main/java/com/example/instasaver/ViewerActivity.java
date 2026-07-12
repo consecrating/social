@@ -2,11 +2,12 @@ package com.example.instasaver;
 
 import android.net.Uri;
 import android.os.Bundle;
+import android.view.GestureDetector;
 import android.view.LayoutInflater;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
-import android.widget.MediaController;
 import android.widget.TextView;
 import android.widget.VideoView;
 
@@ -20,12 +21,13 @@ import com.bumptech.glide.Glide;
 import java.io.File;
 
 /**
- * Full-screen, swipeable viewer for the downloaded library.
+ * Full-screen, swipeable viewer.
  *
- * The caller passes the exact list currently on screen (paths + a video flag per
- * item) and the index that was tapped, so swiping left/right moves through the
- * same, already-filtered/sorted set. Photos display fit-to-screen; reels/videos
- * play with a standard media controller and only the visible page plays.
+ * Photos: pinch / double-tap to zoom, drag to pan.
+ * Reels/videos: distraction-free — no counter or controls shown while a reel
+ * plays. Double-tap pauses (freezes the frame); double-tapping again while
+ * paused steps to the next frame; a single tap resumes playback (or, while
+ * playing, toggles the close/counter bar).
  */
 public class ViewerActivity extends AppCompatActivity {
 
@@ -39,6 +41,7 @@ public class ViewerActivity extends AppCompatActivity {
     private ViewPager2 pager;
     private ViewerAdapter adapter;
     private TextView counter;
+    private View topBar;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -59,18 +62,21 @@ public class ViewerActivity extends AppCompatActivity {
         if (index < 0 || index >= paths.length) index = 0;
 
         counter = findViewById(R.id.counter);
+        topBar = findViewById(R.id.topBar);
         findViewById(R.id.close).setOnClickListener(v -> finish());
 
         pager = findViewById(R.id.viewerPager);
-        adapter = new ViewerAdapter(paths, video);
+        adapter = new ViewerAdapter(paths, video, this::toggleTopBar, this::hideTopBar);
         pager.setAdapter(adapter);
         pager.setCurrentItem(index, false);
         updateCounter(index);
+        updateTopBarForType(index);
 
         pager.registerOnPageChangeCallback(new ViewPager2.OnPageChangeCallback() {
             @Override
             public void onPageSelected(int position) {
                 updateCounter(position);
+                updateTopBarForType(position);
                 activate(position);
             }
         });
@@ -83,7 +89,20 @@ public class ViewerActivity extends AppCompatActivity {
         counter.setText((position + 1) + " / " + paths.length);
     }
 
-    /** Play the video on the given page and pause any previously playing one. */
+    /** Reels are shown distraction-free: the top bar is hidden for video pages. */
+    private void updateTopBarForType(int position) {
+        boolean isVideo = position >= 0 && position < video.length && video[position];
+        topBar.setVisibility(isVideo ? View.GONE : View.VISIBLE);
+    }
+
+    private void toggleTopBar() {
+        topBar.setVisibility(topBar.getVisibility() == View.VISIBLE ? View.GONE : View.VISIBLE);
+    }
+
+    private void hideTopBar() {
+        topBar.setVisibility(View.GONE);
+    }
+
     private void activate(int position) {
         View child = pager.getChildAt(0);
         if (child instanceof RecyclerView) {
@@ -106,11 +125,15 @@ public class ViewerActivity extends AppCompatActivity {
 
         private final String[] paths;
         private final boolean[] video;
+        private final Runnable onToggleBar;
+        private final Runnable onHideBar;
         private VideoHolder active;
 
-        ViewerAdapter(String[] paths, boolean[] video) {
+        ViewerAdapter(String[] paths, boolean[] video, Runnable onToggleBar, Runnable onHideBar) {
             this.paths = paths;
             this.video = video;
+            this.onToggleBar = onToggleBar;
+            this.onHideBar = onHideBar;
         }
 
         @Override
@@ -123,7 +146,9 @@ public class ViewerActivity extends AppCompatActivity {
         public RecyclerView.ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
             LayoutInflater inf = LayoutInflater.from(parent.getContext());
             if (viewType == T_VIDEO) {
-                return new VideoHolder(inf.inflate(R.layout.item_viewer_video, parent, false));
+                return new VideoHolder(
+                        inf.inflate(R.layout.item_viewer_video, parent, false),
+                        onToggleBar, onHideBar);
             }
             return new ImageHolder(inf.inflate(R.layout.item_viewer_image, parent, false));
         }
@@ -172,22 +197,48 @@ public class ViewerActivity extends AppCompatActivity {
             }
         }
 
+        @SuppressWarnings("ClickableViewAccessibility")
         static class VideoHolder extends RecyclerView.ViewHolder {
             final VideoView videoView;
             private boolean prepared;
             private boolean playWhenReady;
+            private final GestureDetector detector;
 
-            VideoHolder(@NonNull View v) {
+            VideoHolder(@NonNull View v, Runnable onToggleBar, Runnable onHideBar) {
                 super(v);
                 videoView = v.findViewById(R.id.video);
+
+                detector = new GestureDetector(v.getContext(),
+                        new GestureDetector.SimpleOnGestureListener() {
+                            @Override
+                            public boolean onDoubleTap(MotionEvent e) {
+                                if (videoView.isPlaying()) {
+                                    videoView.pause(); // freeze the current frame
+                                } else {
+                                    // step to (approximately) the next frame
+                                    videoView.seekTo(videoView.getCurrentPosition() + 40);
+                                }
+                                return true;
+                            }
+
+                            @Override
+                            public boolean onSingleTapConfirmed(MotionEvent e) {
+                                if (!videoView.isPlaying()) {
+                                    videoView.start();          // resume
+                                    if (onHideBar != null) onHideBar.run();
+                                } else if (onToggleBar != null) {
+                                    onToggleBar.run();
+                                }
+                                return true;
+                            }
+                        });
+
+                v.setOnTouchListener((view, event) -> detector.onTouchEvent(event));
             }
 
             void bind(File file) {
                 prepared = false;
                 playWhenReady = false;
-                MediaController controller = new MediaController(itemView.getContext());
-                controller.setAnchorView(videoView);
-                videoView.setMediaController(controller);
                 videoView.setVideoURI(Uri.fromFile(file));
                 videoView.setOnPreparedListener(mp -> {
                     mp.setLooping(true);

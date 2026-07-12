@@ -32,9 +32,19 @@ Install:
   - **Sort** — Newest, Oldest, Name, or Largest.
   - **Rename**, **Move to album**, move to collections, or move to the Delete bin.
 - **Built-in swipeable viewer** — tap any item to open a full-screen viewer, then
-  swipe left/right to move through the next/previous photos and reels. Videos play
-  with standard controls (only the visible one plays); use the ⋮ menu's
-  "Open in another app" to hand a file to an external player instead.
+  swipe left/right through the next/previous items.
+  - **Photos:** pinch and double-tap to zoom, drag to pan.
+  - **Reels:** distraction-free — no counter/controls while playing. Double-tap to
+    pause (freezes the frame); double-tap again while paused to step to the next
+    frame; single-tap to resume (or reveal the close bar).
+- **Handle-based filenames** — downloads are named `creatorhandle-shortcode.mp4`
+  instead of a generic prefix.
+- **Hidden Albums vault as folders** — long-press the "InstaSaver" title to open
+  it. Each album is a folder with a customizable cover (pick an image from your
+  gallery, or choose a color), and opening one shows separate **Reels / Photos**
+  tabs. Renaming/deleting albums is available from a folder's menu.
+- **Private "Move to album"** — because albums are private, the Move-to-album
+  action must be **pressed and held for 5 seconds** to unlock.
 - **Share** one or many items to other apps.
 - **Save to phone gallery** — export a copy into your system Photos/Gallery.
 - **Carousels** — multi-item posts download every photo/video.

@@ -19,23 +19,14 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Resolves direct media URLs (mp4 for reels/videos, jpg for photos) from a
- * public Instagram post or reel link.
+ * Resolves direct media URLs (mp4 for reels/videos, jpg for photos) plus the
+ * creator's handle from a public Instagram post or reel link.
  *
- * Background: Instagram no longer serves og:video/og:image meta tags to
- * logged-out requests — the post page redirects to a login wall. So this class
- * talks to Instagram's web API the same way the website's own JavaScript does:
- *
- *   1. Hit instagram.com once to obtain a `csrftoken` cookie.
- *   2. Call the GraphQL endpoint for the post, identified by its shortcode,
- *      sending the `X-IG-App-ID` header (the web app id) plus the CSRF token.
- *   3. Parse `xdt_shortcode_media` for video_url / display_url, including
- *      carousel children (edge_sidecar_to_children).
- *
- * If the API path fails, it falls back to the legacy og: tag scrape.
- *
- * NOTE: This only works for PUBLIC content and depends on Instagram's private
- * endpoints, which change periodically. All the fragile bits are isolated here.
+ * Instagram no longer serves og:video/og:image to logged-out requests (the post
+ * page redirects to a login wall), so this talks to Instagram's web API the way
+ * the site's own JavaScript does: a GraphQL query by shortcode with the
+ * X-IG-App-ID header, with a mobile media-info endpoint and an og: scrape as
+ * fallbacks. PUBLIC content only; the private endpoints change periodically.
  */
 public class InstagramExtractor {
 
@@ -46,6 +37,21 @@ public class InstagramExtractor {
         Media(String url, boolean isVideo) {
             this.url = url;
             this.isVideo = isVideo;
+        }
+    }
+
+    /** The resolved media plus the owner's handle (username, without '@'). */
+    public static class Result {
+        public final List<Media> items;
+        public final String owner;
+
+        Result(List<Media> items, String owner) {
+            this.items = items;
+            this.owner = owner;
+        }
+
+        boolean isEmpty() {
+            return items == null || items.isEmpty();
         }
     }
 
@@ -67,7 +73,6 @@ public class InstagramExtractor {
             "7950326061742207"
     };
 
-    // Matches instagram.com/p/<code>/, /reel/<code>/, /reels/<code>/, /tv/<code>/
     private static final Pattern SHORTCODE =
             Pattern.compile("instagram\\.com/(?:[^/]+/)?(?:p|reel|reels|tv)/([A-Za-z0-9_-]+)");
 
@@ -84,24 +89,12 @@ public class InstagramExtractor {
     }
 
     /**
-     * Resolve the FIRST downloadable media item (kept for backward compatibility).
-     * Blocking — must run off the main thread.
-     */
-    public static Media resolve(String rawUrl) throws IOException {
-        List<Media> all = resolveAll(rawUrl);
-        if (all.isEmpty()) {
-            throw new IOException("Couldn't find downloadable media.");
-        }
-        return all.get(0);
-    }
-
-    /**
-     * Resolve ALL media items in the post (handles carousels / multi-item posts).
+     * Resolve ALL media items in the post (handles carousels) plus the handle.
      * Blocking — must run off the main thread.
      *
      * @throws IOException on network failure or if no media could be found.
      */
-    public static List<Media> resolveAll(String rawUrl) throws IOException {
+    public static Result resolveAll(String rawUrl) throws IOException {
         String shortcode = extractShortcode(rawUrl);
         if (shortcode == null) {
             throw new IOException("That doesn't look like an Instagram post or reel link.");
@@ -111,16 +104,15 @@ public class InstagramExtractor {
 
         // 1) The web GraphQL API (what instagram.com's own JS uses).
         try {
-            List<Media> r = resolveViaApi(shortcode);
+            Result r = resolveViaApi(shortcode);
             if (!r.isEmpty()) return r;
         } catch (IOException e) {
             firstError = e;
         }
 
-        // 2) The private mobile-web media info endpoint (different shape, often
-        //    succeeds when GraphQL doc_ids are stale). Needs the numeric media id.
+        // 2) The private mobile-web media info endpoint (different shape).
         try {
-            List<Media> r = resolveViaMediaInfo(shortcode);
+            Result r = resolveViaMediaInfo(shortcode);
             if (!r.isEmpty()) return r;
         } catch (IOException e) {
             if (firstError == null) firstError = e;
@@ -129,7 +121,7 @@ public class InstagramExtractor {
         // 3) Legacy Open Graph tag scrape (rarely works now, but cheap to try).
         try {
             List<Media> r = resolveViaOgTags(shortcode);
-            if (!r.isEmpty()) return r;
+            if (!r.isEmpty()) return new Result(r, null);
         } catch (IOException ignored) {
             // fall through
         }
@@ -141,23 +133,21 @@ public class InstagramExtractor {
     // Primary: Instagram web GraphQL API
     // ---------------------------------------------------------------------
 
-    private static List<Media> resolveViaApi(String shortcode) throws IOException {
+    private static Result resolveViaApi(String shortcode) throws IOException {
         String csrf = fetchCsrfToken();
 
         IOException last = null;
         for (String docId : DOC_IDS) {
             try {
                 String json = graphqlQuery(shortcode, docId, csrf);
-                List<Media> media = parseGraphql(json);
-                if (!media.isEmpty()) {
-                    return media;
-                }
+                Result r = parseGraphql(json);
+                if (!r.isEmpty()) return r;
             } catch (IOException e) {
                 last = e;
             }
         }
         if (last != null) throw last;
-        return new ArrayList<>();
+        return new Result(new ArrayList<>(), null);
     }
 
     /** Load instagram.com once and pull the csrftoken from Set-Cookie. */
@@ -227,18 +217,21 @@ public class InstagramExtractor {
         }
     }
 
-    private static List<Media> parseGraphql(String json) throws IOException {
+    private static Result parseGraphql(String json) throws IOException {
         List<Media> out = new ArrayList<>();
+        String owner = null;
         try {
             JSONObject root = new JSONObject(json);
             JSONObject data = root.optJSONObject("data");
-            if (data == null) return out;
+            if (data == null) return new Result(out, null);
 
             JSONObject media = data.optJSONObject("xdt_shortcode_media");
             if (media == null) media = data.optJSONObject("shortcode_media");
-            if (media == null) return out;
+            if (media == null) return new Result(out, null);
 
-            // Carousel? Iterate children.
+            JSONObject ownerObj = media.optJSONObject("owner");
+            if (ownerObj != null) owner = ownerObj.optString("username", null);
+
             JSONObject sidecar = media.optJSONObject("edge_sidecar_to_children");
             if (sidecar != null) {
                 JSONArray edges = sidecar.optJSONArray("edges");
@@ -247,7 +240,7 @@ public class InstagramExtractor {
                         JSONObject node = edges.getJSONObject(i).optJSONObject("node");
                         if (node != null) addNode(node, out);
                     }
-                    if (!out.isEmpty()) return out;
+                    if (!out.isEmpty()) return new Result(out, owner);
                 }
             }
 
@@ -255,7 +248,7 @@ public class InstagramExtractor {
         } catch (Exception e) {
             throw new IOException("Unexpected response from Instagram.");
         }
-        return out;
+        return new Result(out, owner);
     }
 
     private static void addNode(JSONObject node, List<Media> out) {
@@ -277,9 +270,9 @@ public class InstagramExtractor {
     // Fallback: private mobile-web media info endpoint
     // ---------------------------------------------------------------------
 
-    private static List<Media> resolveViaMediaInfo(String shortcode) throws IOException {
+    private static Result resolveViaMediaInfo(String shortcode) throws IOException {
         String mediaId = shortcodeToMediaId(shortcode);
-        if (mediaId == null) return new ArrayList<>();
+        if (mediaId == null) return new Result(new ArrayList<>(), null);
 
         HttpURLConnection conn = null;
         try {
@@ -300,30 +293,33 @@ public class InstagramExtractor {
         }
     }
 
-    private static List<Media> parseMediaInfo(String json) throws IOException {
+    private static Result parseMediaInfo(String json) throws IOException {
         List<Media> out = new ArrayList<>();
+        String owner = null;
         try {
             JSONObject root = new JSONObject(json);
             JSONArray items = root.optJSONArray("items");
-            if (items == null || items.length() == 0) return out;
+            if (items == null || items.length() == 0) return new Result(out, null);
             JSONObject item = items.getJSONObject(0);
+
+            JSONObject user = item.optJSONObject("user");
+            if (user != null) owner = user.optString("username", null);
 
             JSONArray carousel = item.optJSONArray("carousel_media");
             if (carousel != null) {
                 for (int i = 0; i < carousel.length(); i++) {
                     addMediaInfoNode(carousel.getJSONObject(i), out);
                 }
-                if (!out.isEmpty()) return out;
+                if (!out.isEmpty()) return new Result(out, owner);
             }
             addMediaInfoNode(item, out);
         } catch (Exception e) {
             throw new IOException("Unexpected response from Instagram.");
         }
-        return out;
+        return new Result(out, owner);
     }
 
     private static void addMediaInfoNode(JSONObject node, List<Media> out) {
-        // video_versions -> pick the first (highest quality); else image_versions2.
         JSONArray videos = node.optJSONArray("video_versions");
         if (videos != null && videos.length() > 0) {
             String url = videos.optJSONObject(0).optString("url", null);
@@ -353,7 +349,7 @@ public class InstagramExtractor {
         BigInteger id = BigInteger.ZERO;
         for (int i = 0; i < shortcode.length(); i++) {
             int val = alphabet.indexOf(shortcode.charAt(i));
-            if (val < 0) return null; // unexpected char
+            if (val < 0) return null;
             id = id.multiply(base).add(BigInteger.valueOf(val));
         }
         return id.toString();
@@ -409,7 +405,7 @@ public class InstagramExtractor {
             String line;
             while ((line = reader.readLine()) != null) {
                 sb.append(line).append('\n');
-                if (sb.length() > 3_000_000) break; // safety cap
+                if (sb.length() > 3_000_000) break;
             }
         }
         return sb.toString();
@@ -426,7 +422,6 @@ public class InstagramExtractor {
                 + "and try again (Instagram rate-limits repeated requests).";
     }
 
-    /** Instagram HTML-escapes ampersands in URLs; undo the common cases. */
     private static String unescape(String s) {
         return s.replace("&amp;", "&")
                 .replace("&#38;", "&")

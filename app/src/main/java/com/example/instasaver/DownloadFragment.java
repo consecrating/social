@@ -88,15 +88,16 @@ public class DownloadFragment extends Fragment {
 
         executor.execute(() -> {
             try {
-                final List<InstagramExtractor.Media> items = InstagramExtractor.resolveAll(raw);
+                final InstagramExtractor.Result res = InstagramExtractor.resolveAll(raw);
                 final String shortcode = InstagramExtractor.extractShortcode(raw);
+                final String handle = sanitizeHandle(res.owner);
                 main.post(() -> {
                     if (!isAdded()) return;
                     int index = 1;
-                    for (InstagramExtractor.Media media : items) {
-                        enqueueDownload(media, shortcode, index++);
+                    for (InstagramExtractor.Media media : res.items) {
+                        enqueueDownload(media, handle, shortcode, index++);
                     }
-                    int count = items.size();
+                    int count = res.items.size();
                     setBusy(false, count + (count == 1 ? " item" : " items")
                             + " downloading. Check the Reels / Photos tabs.");
                 });
@@ -108,12 +109,21 @@ public class DownloadFragment extends Fragment {
         });
     }
 
-    private void enqueueDownload(InstagramExtractor.Media media, String shortcode, int index) {
+    /** Make a handle safe for a filename; empty string if none. */
+    private String sanitizeHandle(String owner) {
+        if (owner == null) return "";
+        String h = owner.trim().replaceAll("[\\\\/:*?\"<>|\\s]", "_");
+        return h;
+    }
+
+    private void enqueueDownload(InstagramExtractor.Media media, String handle,
+                                 String shortcode, int index) {
         try {
             String ext = media.isVideo ? ".mp4" : ".jpg";
-            String base = "instasaver_"
-                    + (shortcode != null ? shortcode : String.valueOf(System.currentTimeMillis()));
-            String name = (index > 1 ? base + "_" + index : base) + ext;
+            String id = shortcode != null ? shortcode : String.valueOf(System.currentTimeMillis());
+            // Filename: <handle>-<shortcode>[-N].ext  (falls back to <shortcode> if no handle)
+            String base = (handle != null && !handle.isEmpty()) ? handle + "-" + id : id;
+            String name = (index > 1 ? base + "-" + index : base) + ext;
 
             // Save into the app's own external Movies/Pictures dir so the library
             // can manage the files without any storage permission.
