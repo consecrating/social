@@ -203,6 +203,55 @@ public class MediaRepository {
         return item.file.renameTo(target) ? target : null;
     }
 
+    /** Create an empty album folder (under both media roots so it shows in both tabs). */
+    public boolean createAlbum(String name) {
+        String clean = sanitize(name);
+        if (clean.isEmpty() || isReserved(clean)) return false;
+        boolean ok = false;
+        for (boolean isVideo : new boolean[]{true, false}) {
+            File root = root(isVideo);
+            if (root == null) continue;
+            File dir = new File(root, clean);
+            ok = dir.exists() ? true : (dir.mkdirs() || ok);
+        }
+        return ok;
+    }
+
+    /** All album folder names across both roots (excluding reserved collections). */
+    private java.util.Set<String> allAlbumFolders() {
+        java.util.Set<String> names = new java.util.TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+        for (boolean isVideo : new boolean[]{true, false}) {
+            File root = root(isVideo);
+            if (root == null || !root.exists()) continue;
+            File[] dirs = root.listFiles(File::isDirectory);
+            if (dirs != null) {
+                for (File d : dirs) if (!isReserved(d.getName())) names.add(d.getName());
+            }
+        }
+        return names;
+    }
+
+    private boolean hasType(String album, boolean isVideo) {
+        File root = root(isVideo);
+        return root != null && containsMedia(new File(root, sanitize(album)), isVideo);
+    }
+
+    private boolean isEmptyAlbum(String album) {
+        return !hasType(album, true) && !hasType(album, false);
+    }
+
+    /**
+     * Albums to show under a type tab: those containing that media type, plus any
+     * completely empty folders (so freshly created folders are visible and usable).
+     */
+    public List<String> albumsForType(boolean isVideo) {
+        List<String> out = new ArrayList<>();
+        for (String name : allAlbumFolders()) {
+            if (hasType(name, isVideo) || isEmptyAlbum(name)) out.add(name);
+        }
+        return out;
+    }
+
     /** Rename an album folder under both media roots. */
     public boolean renameAlbum(String from, String to) {
         String cleanTo = sanitize(to);

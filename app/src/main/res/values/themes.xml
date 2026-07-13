@@ -5,6 +5,15 @@
         <item name="android:statusBarColor">@color/purple</item>
     </style>
 
+    <style name="ReelCtrl">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:background">?attr/selectableItemBackgroundBorderless</item>
+        <item name="android:scaleType">fitCenter</item>
+        <item name="android:padding">8dp</item>
+    </style>
+
     <style name="ActionRow">
         <item name="android:layout_width">match_parent</item>
         <item name="android:layout_height">wrap_content</item>

@@ -33,6 +33,15 @@
             android:textStyle="bold" />
 
         <ImageView
+            android:id="@+id/newFolderBtn"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:padding="12dp"
+            android:src="@drawable/ic_create_folder"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/new_folder" />
+
+        <ImageView
             android:id="@+id/importBtn"
             android:layout_width="48dp"
             android:layout_height="48dp"

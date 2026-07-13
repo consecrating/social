@@ -23,9 +23,16 @@
 
     <string name="albums_title">Albums (hidden)</string>
     <string name="import_from_gallery">Import from gallery</string>
+    <string name="new_folder">New folder</string>
+    <string name="add_files">Add files</string>
 
     <string name="actions">Actions</string>
     <string name="viewer_close">Close</string>
+    <string name="ctrl_prev">Previous reel</string>
+    <string name="ctrl_back">Rewind</string>
+    <string name="ctrl_play_pause">Play or pause</string>
+    <string name="ctrl_forward">Forward</string>
+    <string name="ctrl_next">Next reel</string>
     <string name="action_open">Open in another app</string>
     <string name="action_share">Share</string>
     <string name="action_save_gallery">Save to phone gallery</string>

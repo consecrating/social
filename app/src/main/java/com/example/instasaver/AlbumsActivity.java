@@ -82,8 +82,11 @@ public class AlbumsActivity extends AppCompatActivity implements AlbumFolderAdap
         repo = new MediaRepository(this);
         meta = new AlbumMeta(this);
 
+        Haptics.tick(this); // haptic feedback when the hidden section opens
+
         findViewById(R.id.back).setOnClickListener(v -> finish());
         findViewById(R.id.importBtn).setOnClickListener(v -> launchImportPicker());
+        findViewById(R.id.newFolderBtn).setOnClickListener(v -> promptNewFolder());
         recycler = findViewById(R.id.albumsRecycler);
         emptyView = findViewById(R.id.emptyView);
 
@@ -137,9 +140,29 @@ public class AlbumsActivity extends AppCompatActivity implements AlbumFolderAdap
         reload();
     }
 
+    private void promptNewFolder() {
+        final EditText input = new EditText(this);
+        input.setHint("Folder name");
+        new AlertDialog.Builder(this)
+                .setTitle("New hidden folder")
+                .setView(input)
+                .setPositiveButton("Create", (d, w) -> {
+                    String name = input.getText().toString().trim();
+                    if (name.isEmpty()) return;
+                    if (repo.createAlbum(name)) {
+                        toast("Folder created");
+                    } else {
+                        toast("Couldn't create folder");
+                    }
+                    reload();
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
     private void reload() {
         adapter.setType(currentTypeVideo);
-        List<String> albums = repo.albums(currentTypeVideo);
+        List<String> albums = repo.albumsForType(currentTypeVideo);
         adapter.submit(albums);
         boolean empty = albums.isEmpty();
         emptyView.setVisibility(empty ? View.VISIBLE : View.GONE);

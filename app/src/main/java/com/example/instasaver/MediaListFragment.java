@@ -191,6 +191,11 @@ public class MediaListFragment extends Fragment implements MediaAdapter.Listener
         reloadItemsOnly();
     }
 
+    /** Public reload hook (e.g. after files are imported into this album). */
+    public void refresh() {
+        reload();
+    }
+
     private void reloadItemsOnly() {
         if (!isAdded()) return;
         List<DownloadedItem> items;
@@ -296,6 +301,7 @@ public class MediaListFragment extends Fragment implements MediaAdapter.Listener
     private void bulkMoveToAlbum() {
         final List<DownloadedItem> sel = adapter.getSelected();
         if (sel.isEmpty()) return;
+        Haptics.tick(getContext());
         List<String> options = new ArrayList<>(repo.albums(isVideoType()));
         options.add("New album…");
         final CharSequence[] arr = options.toArray(new CharSequence[0]);
@@ -590,6 +596,7 @@ public class MediaListFragment extends Fragment implements MediaAdapter.Listener
     }
 
     private void moveToAlbum(DownloadedItem item) {
+        Haptics.tick(getContext());
         List<String> albums = repo.albums(isVideoType());
         List<String> options = new ArrayList<>();
         options.add(MediaRepository.ALL + " (no album)");

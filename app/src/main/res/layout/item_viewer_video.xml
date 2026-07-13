@@ -9,4 +9,47 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:layout_gravity="center" />
+
+    <LinearLayout
+        android:id="@+id/videoControls"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:orientation="horizontal"
+        android:gravity="center"
+        android:background="#66000000"
+        android:paddingTop="10dp"
+        android:paddingBottom="10dp"
+        android:visibility="gone">
+
+        <ImageButton
+            android:id="@+id/prevReel"
+            style="@style/ReelCtrl"
+            android:src="@drawable/ic_skip_previous"
+            android:contentDescription="@string/ctrl_prev" />
+
+        <ImageButton
+            android:id="@+id/seekBack"
+            style="@style/ReelCtrl"
+            android:src="@drawable/ic_rewind"
+            android:contentDescription="@string/ctrl_back" />
+
+        <ImageButton
+            android:id="@+id/playPause"
+            style="@style/ReelCtrl"
+            android:src="@drawable/ic_pause"
+            android:contentDescription="@string/ctrl_play_pause" />
+
+        <ImageButton
+            android:id="@+id/seekForward"
+            style="@style/ReelCtrl"
+            android:src="@drawable/ic_forward"
+            android:contentDescription="@string/ctrl_forward" />
+
+        <ImageButton
+            android:id="@+id/nextReel"
+            style="@style/ReelCtrl"
+            android:src="@drawable/ic_skip_next"
+            android:contentDescription="@string/ctrl_next" />
+    </LinearLayout>
 </FrameLayout>
