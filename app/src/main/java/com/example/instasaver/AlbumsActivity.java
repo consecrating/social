@@ -68,8 +68,9 @@ public class AlbumsActivity extends AppCompatActivity implements AlbumFolderAdap
             registerForActivityResult(new ActivityResultContracts.StartActivityForResult(),
                     result -> {
                         if (result.getResultCode() == RESULT_OK && result.getData() != null) {
-                            List<Uri> uris = GalleryUtil.collectUris(result.getData());
-                            if (!uris.isEmpty()) chooseAlbumThenImport(uris);
+                            ArrayList<Uri> uris = result.getData()
+                                    .getParcelableArrayListExtra(MediaPickerActivity.EXTRA_RESULT_URIS);
+                            if (uris != null && !uris.isEmpty()) chooseAlbumThenImport(uris);
                         }
                     });
 
@@ -199,12 +200,10 @@ public class AlbumsActivity extends AppCompatActivity implements AlbumFolderAdap
     // ------------------------------------------------------------------
 
     private void launchImportPicker() {
-        try {
-            VaultLock.beginInternalActivity();
-            importPicker.launch(GalleryUtil.chooser(false, false, true));
-        } catch (Exception e) {
-            toast("No gallery app available.");
-        }
+        VaultLock.beginInternalActivity();
+        Intent i = new Intent(this, MediaPickerActivity.class);
+        i.putExtra(MediaPickerActivity.EXTRA_MODE, MediaPickerActivity.MODE_BOTH);
+        importPicker.launch(i);
     }
 
     private void chooseAlbumThenImport(List<Uri> uris) {

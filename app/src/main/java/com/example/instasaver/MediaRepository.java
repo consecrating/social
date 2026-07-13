@@ -345,6 +345,8 @@ public class MediaRepository {
         File target = new File(dir, name);
         if (target.exists()) target = uniquify(target);
 
+        long originalTs = queryLastModifiedMs(cr, uri);
+
         try (InputStream in = cr.openInputStream(uri);
              OutputStream out = new FileOutputStream(target)) {
             if (in == null) return null;
@@ -355,7 +357,29 @@ public class MediaRepository {
             target.delete();
             return null;
         }
+        // Preserve the original capture/modified time so a later "move back to
+        // gallery" keeps the original timestamp instead of jumping to "now".
+        if (originalTs > 0) target.setLastModified(originalTs);
         return target;
+    }
+
+    private long queryLastModifiedMs(ContentResolver cr, Uri uri) {
+        try (Cursor c = cr.query(uri,
+                new String[]{MediaStore.MediaColumns.DATE_MODIFIED}, null, null, null)) {
+            if (c != null && c.moveToFirst() && !c.isNull(0)) {
+                long s = c.getLong(0);
+                if (s > 0) return s * 1000L; // MediaStore stores seconds
+            }
+        } catch (Exception ignored) { }
+        try (Cursor c = cr.query(uri,
+                new String[]{android.provider.DocumentsContract.Document.COLUMN_LAST_MODIFIED},
+                null, null, null)) {
+            if (c != null && c.moveToFirst() && !c.isNull(0)) {
+                long ms = c.getLong(0);
+                if (ms > 0) return ms;
+            }
+        } catch (Exception ignored) { }
+        return 0;
     }
 
     private boolean looksLikeVideo(String name) {
@@ -407,6 +431,14 @@ public class MediaRepository {
         ContentValues values = new ContentValues();
         values.put(MediaStore.MediaColumns.DISPLAY_NAME, item.file.getName());
         values.put(MediaStore.MediaColumns.MIME_TYPE, mime);
+
+        // Preserve the original timestamp so restored items don't sort as "now".
+        long ts = item.lastModified > 0 ? item.lastModified : System.currentTimeMillis();
+        values.put(MediaStore.MediaColumns.DATE_ADDED, ts / 1000);
+        values.put(MediaStore.MediaColumns.DATE_MODIFIED, ts / 1000);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            values.put(MediaStore.MediaColumns.DATE_TAKEN, ts);
+        }
 
         Uri collection;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {

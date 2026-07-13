@@ -58,7 +58,7 @@ public class MainActivity extends AppCompatActivity {
         title.setOnTouchListener((v, ev) -> {
             switch (ev.getActionMasked()) {
                 case android.view.MotionEvent.ACTION_DOWN:
-                    handler.postDelayed(open, 3000);
+                    handler.postDelayed(open, 2000);
                     return true;
                 case android.view.MotionEvent.ACTION_UP:
                 case android.view.MotionEvent.ACTION_CANCEL:

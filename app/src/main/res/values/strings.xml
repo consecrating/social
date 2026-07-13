@@ -23,6 +23,9 @@
 
     <string name="albums_title">Albums (hidden)</string>
     <string name="import_from_gallery">Import from gallery</string>
+    <string name="pick_title">Select from gallery</string>
+    <string name="pick_done">Done</string>
+    <string name="pick_empty">No media found.</string>
     <string name="new_folder">New folder</string>
     <string name="add_files">Add files</string>
 

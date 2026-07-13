@@ -338,8 +338,8 @@ public class MediaListFragment extends Fragment implements MediaAdapter.Listener
         selectionButtons.addView(b);
     }
 
-    /** Move-to-album is a private feature: it requires a 3-second press to arm. */
-    private static final long HOLD_MS = 3000;
+    /** Move-to-album is a private feature: it requires a 2-second press to arm. */
+    private static final long HOLD_MS = 2000;
 
     private void addSelBtnHold(int labelRes, Runnable action) {
         Button b = new Button(requireContext(),

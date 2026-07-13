@@ -39,8 +39,9 @@ public class AlbumDetailActivity extends AppCompatActivity {
             registerForActivityResult(new ActivityResultContracts.StartActivityForResult(),
                     result -> {
                         if (result.getResultCode() == RESULT_OK && result.getData() != null) {
-                            List<Uri> uris = GalleryUtil.collectUris(result.getData());
-                            if (!uris.isEmpty()) confirmAddMode(uris);
+                            ArrayList<Uri> uris = result.getData()
+                                    .getParcelableArrayListExtra(MediaPickerActivity.EXTRA_RESULT_URIS);
+                            if (uris != null && !uris.isEmpty()) confirmAddMode(uris);
                         }
                     });
 
@@ -90,12 +91,11 @@ public class AlbumDetailActivity extends AppCompatActivity {
     }
 
     private void launchAddFiles() {
-        try {
-            VaultLock.beginInternalActivity();
-            addFilesPicker.launch(GalleryUtil.chooser(isVideo, !isVideo, true));
-        } catch (Exception e) {
-            toast("No gallery app available.");
-        }
+        VaultLock.beginInternalActivity();
+        Intent i = new Intent(this, MediaPickerActivity.class);
+        i.putExtra(MediaPickerActivity.EXTRA_MODE,
+                isVideo ? MediaPickerActivity.MODE_VIDEO : MediaPickerActivity.MODE_IMAGE);
+        addFilesPicker.launch(i);
     }
 
     private void confirmAddMode(List<Uri> uris) {
