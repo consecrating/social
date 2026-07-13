@@ -146,7 +146,8 @@ public class AlbumDetailActivity extends AppCompatActivity {
         int removed = GalleryUtil.deleteOriginals(this, uris, deleteLauncher);
         if (removed != GalleryUtil.DELETE_PENDING) {
             toast(removed > 0 ? removed + " removed from gallery"
-                    : "Couldn't locate the originals to remove — delete them from your gallery.");
+                    : "Couldn't remove originals automatically (Android "
+                            + android.os.Build.VERSION.RELEASE + "). Delete them from your gallery.");
         }
     }
 

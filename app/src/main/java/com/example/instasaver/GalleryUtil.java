@@ -3,10 +3,12 @@ package com.example.instasaver;
 import android.Manifest;
 import android.app.Activity;
 import android.app.PendingIntent;
+import android.app.RecoverableSecurityException;
 import android.content.ContentResolver;
 import android.content.ContentUris;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentSender;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.net.Uri;
@@ -80,40 +82,50 @@ public final class GalleryUtil {
     public static int deleteOriginals(Activity activity, List<Uri> uris,
                                       ActivityResultLauncher<IntentSenderRequest> senderLauncher) {
         ContentResolver cr = activity.getContentResolver();
-        int removed = 0;
 
+        // Resolve each picked URI to a real MediaStore URI so it can be deleted.
+        ArrayList<Uri> mediaUris = new ArrayList<>();
+        for (Uri u : uris) {
+            Uri media = resolveDeletable(activity, u);
+            if (media != null && !mediaUris.contains(media)) {
+                mediaUris.add(media);
+            }
+        }
+        if (mediaUris.isEmpty()) return 0;
+
+        // Android 11+ : one system dialog confirms deletion of all of them.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            // Resolve each picked URI to a real MediaStore URI so it can be deleted.
-            ArrayList<Uri> mediaUris = new ArrayList<>();
-            for (Uri u : uris) {
-                Uri media = resolveDeletable(activity, u);
-                if (media != null && !mediaUris.contains(media)) {
-                    mediaUris.add(media);
-                }
+            try {
+                PendingIntent pi = MediaStore.createDeleteRequest(cr, mediaUris);
+                VaultLock.beginInternalActivity(); // don't lock while the system dialog shows
+                senderLauncher.launch(
+                        new IntentSenderRequest.Builder(pi.getIntentSender()).build());
+                return DELETE_PENDING;
+            } catch (Exception ignored) {
+                return 0;
             }
-            if (!mediaUris.isEmpty()) {
-                try {
-                    PendingIntent pi = MediaStore.createDeleteRequest(cr, mediaUris);
-                    VaultLock.beginInternalActivity(); // don't lock while the system dialog shows
-                    senderLauncher.launch(
-                            new IntentSenderRequest.Builder(pi.getIntentSender()).build());
-                    return DELETE_PENDING;
-                } catch (Exception ignored) { }
-            }
-            return removed;
         }
 
-        // Android 10 and below: direct delete (works with READ/WRITE permission).
-        for (Uri u : uris) {
+        // Android 10 (Q): deleting another app's media throws a
+        // RecoverableSecurityException whose IntentSender asks the user to allow it.
+        int removed = 0;
+        for (Uri media : mediaUris) {
             try {
-                Uri media = resolveDeletable(activity, u);
-                if (media != null && cr.delete(media, null, null) > 0) {
-                    removed++;
-                } else if (DocumentsContract.isDocumentUri(activity, u)
-                        && DocumentsContract.deleteDocument(cr, u)) {
+                if (cr.delete(media, null, null) > 0) {
                     removed++;
                 }
-            } catch (Exception ignored) { }
+            } catch (Exception e) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
+                        && e instanceof RecoverableSecurityException) {
+                    try {
+                        IntentSender is = ((RecoverableSecurityException) e)
+                                .getUserAction().getActionIntent().getIntentSender();
+                        VaultLock.beginInternalActivity();
+                        senderLauncher.launch(new IntentSenderRequest.Builder(is).build());
+                        return DELETE_PENDING;
+                    } catch (Exception ignored) { }
+                }
+            }
         }
         return removed;
     }
