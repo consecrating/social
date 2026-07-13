@@ -76,10 +76,25 @@ public class AlbumsActivity extends AppCompatActivity implements AlbumFolderAdap
 
     private final ActivityResultLauncher<IntentSenderRequest> deleteLauncher =
             registerForActivityResult(new ActivityResultContracts.StartIntentSenderForResult(),
-                    r -> {
-                        toast("Originals removed from gallery");
-                        reload();
-                    });
+                    this::onDeleteResult);
+
+    private void onDeleteResult(androidx.activity.result.ActivityResult r) {
+        if (GalleryUtil.isLegacyDelete()) {
+            if (r.getResultCode() == RESULT_OK) {
+                boolean more = GalleryUtil.continueLegacyAfterConsent(this, deleteLauncher);
+                if (!more) {
+                    toast("Removed from gallery");
+                    reload();
+                }
+            } else {
+                GalleryUtil.clearLegacyQueue();
+                reload();
+            }
+        } else {
+            toast("Originals removed from gallery");
+            reload();
+        }
+    }
 
     private List<Uri> pendingDeleteUris;
     private final ActivityResultLauncher<String[]> permLauncher =

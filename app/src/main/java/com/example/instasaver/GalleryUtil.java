@@ -21,6 +21,7 @@ import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.IntentSenderRequest;
 import androidx.core.content.ContextCompat;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -79,6 +80,17 @@ public final class GalleryUtil {
      * create) via the supplied IntentSender launcher. Returns the number removed
      * immediately, or {@link #DELETE_PENDING} when a confirm dialog was launched.
      */
+    /** Queue of MediaStore URIs still to delete on Android 10 (sequential consent). */
+    private static final ArrayDeque<Uri> legacyQueue = new ArrayDeque<>();
+
+    public static boolean isLegacyDelete() {
+        return Build.VERSION.SDK_INT < Build.VERSION_CODES.R;
+    }
+
+    public static void clearLegacyQueue() {
+        legacyQueue.clear();
+    }
+
     public static int deleteOriginals(Activity activity, List<Uri> uris,
                                       ActivityResultLauncher<IntentSenderRequest> senderLauncher) {
         ContentResolver cr = activity.getContentResolver();
@@ -106,14 +118,25 @@ public final class GalleryUtil {
             }
         }
 
-        // Android 10 (Q): deleting another app's media throws a
-        // RecoverableSecurityException whose IntentSender asks the user to allow it.
-        int removed = 0;
-        for (Uri media : mediaUris) {
+        // Android 10 (Q): delete each; the OS throws a RecoverableSecurityException
+        // asking the user to allow it. After they allow, we must RETRY the delete.
+        legacyQueue.clear();
+        legacyQueue.addAll(mediaUris);
+        return pumpLegacyQueue(activity, senderLauncher) ? DELETE_PENDING : 0;
+    }
+
+    /**
+     * Delete queued items until one needs user consent, then launch that consent
+     * dialog. Returns true if a consent dialog was launched (deletion pending).
+     */
+    private static boolean pumpLegacyQueue(Activity activity,
+                                           ActivityResultLauncher<IntentSenderRequest> sender) {
+        ContentResolver cr = activity.getContentResolver();
+        while (!legacyQueue.isEmpty()) {
+            Uri head = legacyQueue.peekFirst();
             try {
-                if (cr.delete(media, null, null) > 0) {
-                    removed++;
-                }
+                cr.delete(head, null, null);
+                legacyQueue.pollFirst(); // deleted (or already gone) → next
             } catch (Exception e) {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
                         && e instanceof RecoverableSecurityException) {
@@ -121,13 +144,32 @@ public final class GalleryUtil {
                         IntentSender is = ((RecoverableSecurityException) e)
                                 .getUserAction().getActionIntent().getIntentSender();
                         VaultLock.beginInternalActivity();
-                        senderLauncher.launch(new IntentSenderRequest.Builder(is).build());
-                        return DELETE_PENDING;
-                    } catch (Exception ignored) { }
+                        sender.launch(new IntentSenderRequest.Builder(is).build());
+                        return true; // wait for consent; head stays in the queue
+                    } catch (Exception ex) {
+                        legacyQueue.pollFirst();
+                    }
+                } else {
+                    legacyQueue.pollFirst();
                 }
             }
         }
-        return removed;
+        return false;
+    }
+
+    /**
+     * Call after the Android 10 consent dialog returns OK: retry the granted item,
+     * then keep going. Returns true if another consent dialog was launched.
+     */
+    public static boolean continueLegacyAfterConsent(Activity activity,
+                                                     ActivityResultLauncher<IntentSenderRequest> sender) {
+        if (!legacyQueue.isEmpty()) {
+            Uri head = legacyQueue.pollFirst(); // now granted → delete once
+            try {
+                activity.getContentResolver().delete(head, null, null);
+            } catch (Exception ignored) { }
+        }
+        return pumpLegacyQueue(activity, sender);
     }
 
     // ------------------------------------------------------------------

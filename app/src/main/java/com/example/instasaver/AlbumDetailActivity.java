@@ -47,7 +47,20 @@ public class AlbumDetailActivity extends AppCompatActivity {
 
     private final ActivityResultLauncher<IntentSenderRequest> deleteLauncher =
             registerForActivityResult(new ActivityResultContracts.StartIntentSenderForResult(),
-                    r -> toast("Originals removed from gallery"));
+                    this::onDeleteResult);
+
+    private void onDeleteResult(androidx.activity.result.ActivityResult r) {
+        if (GalleryUtil.isLegacyDelete()) {
+            if (r.getResultCode() == RESULT_OK) {
+                boolean more = GalleryUtil.continueLegacyAfterConsent(this, deleteLauncher);
+                if (!more) toast("Removed from gallery");
+            } else {
+                GalleryUtil.clearLegacyQueue();
+            }
+        } else {
+            toast("Originals removed from gallery");
+        }
+    }
 
     private List<Uri> pendingDeleteUris;
     private final ActivityResultLauncher<String[]> permLauncher =
