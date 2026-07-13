@@ -80,6 +80,21 @@ public class AlbumsActivity extends AppCompatActivity implements AlbumFolderAdap
                         reload();
                     });
 
+    private List<Uri> pendingDeleteUris;
+    private final ActivityResultLauncher<String[]> permLauncher =
+            registerForActivityResult(new ActivityResultContracts.RequestMultiplePermissions(),
+                    res -> {
+                        boolean granted = false;
+                        for (Boolean b : res.values()) granted |= Boolean.TRUE.equals(b);
+                        List<Uri> pend = pendingDeleteUris;
+                        pendingDeleteUris = null;
+                        if (granted && pend != null) {
+                            doRemoveOriginals(pend);
+                        } else {
+                            toast("Permission is needed to remove originals from the gallery.");
+                        }
+                    });
+
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -254,10 +269,7 @@ public class AlbumsActivity extends AppCompatActivity implements AlbumFolderAdap
             main.post(() -> {
                 toast(done + " of " + uris.size() + " imported to \"" + album + "\"");
                 if (removeOriginals && !imported.isEmpty()) {
-                    int removed = GalleryUtil.deleteOriginals(this, imported, deleteLauncher);
-                    if (removed != GalleryUtil.DELETE_PENDING) {
-                        toast(removed + " removed from gallery");
-                    }
+                    removeOriginals(imported);
                 }
                 reload();
             });
@@ -267,6 +279,24 @@ public class AlbumsActivity extends AppCompatActivity implements AlbumFolderAdap
     // ------------------------------------------------------------------
     // Album folder interactions
     // ------------------------------------------------------------------
+
+    /** Ensure read-media permission (to find the file in MediaStore), then delete. */
+    private void removeOriginals(List<Uri> uris) {
+        if (!GalleryUtil.hasReadMedia(this)) {
+            pendingDeleteUris = uris;
+            VaultLock.beginInternalActivity();
+            permLauncher.launch(GalleryUtil.readMediaPermissions());
+            return;
+        }
+        doRemoveOriginals(uris);
+    }
+
+    private void doRemoveOriginals(List<Uri> uris) {
+        int removed = GalleryUtil.deleteOriginals(this, uris, deleteLauncher);
+        if (removed != GalleryUtil.DELETE_PENDING) {
+            toast(removed + " removed from gallery");
+        }
+    }
 
     @Override
     public void onOpen(String album) {

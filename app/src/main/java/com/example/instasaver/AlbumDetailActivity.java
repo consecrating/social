@@ -48,6 +48,21 @@ public class AlbumDetailActivity extends AppCompatActivity {
             registerForActivityResult(new ActivityResultContracts.StartIntentSenderForResult(),
                     r -> toast("Originals removed from gallery"));
 
+    private List<Uri> pendingDeleteUris;
+    private final ActivityResultLauncher<String[]> permLauncher =
+            registerForActivityResult(new ActivityResultContracts.RequestMultiplePermissions(),
+                    res -> {
+                        boolean granted = false;
+                        for (Boolean b : res.values()) granted |= Boolean.TRUE.equals(b);
+                        List<Uri> pend = pendingDeleteUris;
+                        pendingDeleteUris = null;
+                        if (granted && pend != null) {
+                            doRemoveOriginals(pend);
+                        } else {
+                            toast("Permission is needed to remove originals from the gallery.");
+                        }
+                    });
+
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -111,13 +126,27 @@ public class AlbumDetailActivity extends AppCompatActivity {
                 Fragment f = getSupportFragmentManager().findFragmentById(R.id.albumContainer);
                 if (f instanceof MediaListFragment) ((MediaListFragment) f).refresh();
                 if (removeOriginals && !imported.isEmpty()) {
-                    int removed = GalleryUtil.deleteOriginals(this, imported, deleteLauncher);
-                    if (removed != GalleryUtil.DELETE_PENDING) {
-                        toast(removed + " removed from gallery");
-                    }
+                    removeOriginals(imported);
                 }
             });
         });
+    }
+
+    private void removeOriginals(List<Uri> uris) {
+        if (!GalleryUtil.hasReadMedia(this)) {
+            pendingDeleteUris = uris;
+            VaultLock.beginInternalActivity();
+            permLauncher.launch(GalleryUtil.readMediaPermissions());
+            return;
+        }
+        doRemoveOriginals(uris);
+    }
+
+    private void doRemoveOriginals(List<Uri> uris) {
+        int removed = GalleryUtil.deleteOriginals(this, uris, deleteLauncher);
+        if (removed != GalleryUtil.DELETE_PENDING) {
+            toast(removed + " removed from gallery");
+        }
     }
 
     @Override
