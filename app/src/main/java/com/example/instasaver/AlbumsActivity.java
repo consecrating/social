@@ -139,6 +139,10 @@ public class AlbumsActivity extends AppCompatActivity implements AlbumFolderAdap
     @Override
     protected void onResume() {
         super.onResume();
+        if (VaultLock.consumeInternalActivity()) { // returning from our own picker
+            reload();
+            return;
+        }
         if (!VaultLock.isUnlocked()) { // backgrounded or timed out → re-lock
             finish();
             return;
@@ -181,6 +185,7 @@ public class AlbumsActivity extends AppCompatActivity implements AlbumFolderAdap
 
     private void launchImportPicker() {
         try {
+            VaultLock.beginInternalActivity();
             importPicker.launch(GalleryUtil.chooser(false, false, true));
         } catch (Exception e) {
             toast("No gallery app available.");
@@ -296,6 +301,7 @@ public class AlbumsActivity extends AppCompatActivity implements AlbumFolderAdap
         i.setType("image/*");
         i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
         try {
+            VaultLock.beginInternalActivity();
             pickCover.launch(i);
         } catch (Exception e) {
             toast("No gallery app available.");

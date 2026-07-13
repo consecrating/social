@@ -76,6 +76,7 @@ public class AlbumDetailActivity extends AppCompatActivity {
 
     private void launchAddFiles() {
         try {
+            VaultLock.beginInternalActivity();
             addFilesPicker.launch(GalleryUtil.chooser(isVideo, !isVideo, true));
         } catch (Exception e) {
             toast("No gallery app available.");
@@ -140,6 +141,9 @@ public class AlbumDetailActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
+        if (VaultLock.consumeInternalActivity()) { // returning from our own picker
+            return;
+        }
         if (!VaultLock.isUnlocked()) { // backgrounded or timed out → re-lock
             finish();
         }

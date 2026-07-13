@@ -93,6 +93,7 @@ public final class GalleryUtil {
             if (!mediaUris.isEmpty()) {
                 try {
                     PendingIntent pi = MediaStore.createDeleteRequest(cr, mediaUris);
+                    VaultLock.beginInternalActivity(); // don't lock while the system dialog shows
                     senderLauncher.launch(
                             new IntentSenderRequest.Builder(pi.getIntentSender()).build());
                     return DELETE_PENDING;
