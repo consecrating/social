@@ -72,12 +72,24 @@ public class MediaRepository {
     /** Ensure the root (and optional album subfolder) exists; returns the target dir. */
     public File ensureDir(boolean isVideo, String album) {
         File root = root(isVideo);
-        if (root != null && !root.exists()) root.mkdirs();
         if (root == null) return null;
+        if (!root.exists()) root.mkdirs();
+        ensureNoMedia(root); // keep vault files out of the phone gallery
         if (album == null || album.isEmpty() || ALL.equals(album)) return root;
         File dir = new File(root, sanitize(album));
         if (!dir.exists()) dir.mkdirs();
         return dir;
+    }
+
+    /** Drop a .nomedia file so the media scanner ignores this tree. */
+    private void ensureNoMedia(File dir) {
+        File nomedia = new File(dir, ".nomedia");
+        if (!nomedia.exists()) {
+            try {
+                nomedia.createNewFile();
+            } catch (java.io.IOException ignored) {
+            }
+        }
     }
 
     // ------------------------------------------------------------------

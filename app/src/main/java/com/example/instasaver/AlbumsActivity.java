@@ -1,18 +1,17 @@
 package com.example.instasaver;
 
-import android.content.ClipData;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
-import android.provider.DocumentsContract;
 import android.view.View;
 import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.IntentSenderRequest;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
@@ -69,9 +68,16 @@ public class AlbumsActivity extends AppCompatActivity implements AlbumFolderAdap
             registerForActivityResult(new ActivityResultContracts.StartActivityForResult(),
                     result -> {
                         if (result.getResultCode() == RESULT_OK && result.getData() != null) {
-                            List<Uri> uris = collectUris(result.getData());
+                            List<Uri> uris = GalleryUtil.collectUris(result.getData());
                             if (!uris.isEmpty()) chooseAlbumThenImport(uris);
                         }
+                    });
+
+    private final ActivityResultLauncher<IntentSenderRequest> deleteLauncher =
+            registerForActivityResult(new ActivityResultContracts.StartIntentSenderForResult(),
+                    r -> {
+                        toast("Originals removed from gallery");
+                        reload();
                     });
 
     @Override
@@ -174,32 +180,11 @@ public class AlbumsActivity extends AppCompatActivity implements AlbumFolderAdap
     // ------------------------------------------------------------------
 
     private void launchImportPicker() {
-        Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT);
-        i.addCategory(Intent.CATEGORY_OPENABLE);
-        i.setType("*/*");
-        i.putExtra(Intent.EXTRA_MIME_TYPES, new String[]{"image/*", "video/*"});
-        i.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
-        i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION
-                | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
         try {
-            importPicker.launch(i);
+            importPicker.launch(GalleryUtil.chooser(false, false, true));
         } catch (Exception e) {
             toast("No gallery app available.");
         }
-    }
-
-    private List<Uri> collectUris(Intent data) {
-        List<Uri> uris = new ArrayList<>();
-        ClipData clip = data.getClipData();
-        if (clip != null) {
-            for (int i = 0; i < clip.getItemCount(); i++) {
-                Uri u = clip.getItemAt(i).getUri();
-                if (u != null) uris.add(u);
-            }
-        } else if (data.getData() != null) {
-            uris.add(data.getData());
-        }
-        return uris;
     }
 
     private void chooseAlbumThenImport(List<Uri> uris) {
@@ -264,35 +249,14 @@ public class AlbumsActivity extends AppCompatActivity implements AlbumFolderAdap
             main.post(() -> {
                 toast(done + " of " + uris.size() + " imported to \"" + album + "\"");
                 if (removeOriginals && !imported.isEmpty()) {
-                    deleteOriginals(imported);
+                    int removed = GalleryUtil.deleteOriginals(this, imported, deleteLauncher);
+                    if (removed != GalleryUtil.DELETE_PENDING) {
+                        toast(removed + " removed from gallery");
+                    }
                 }
                 reload();
             });
         });
-    }
-
-    /** Best-effort removal of the original gallery items after a successful copy. */
-    private void deleteOriginals(List<Uri> uris) {
-        int removed = 0, failed = 0;
-        for (Uri uri : uris) {
-            try {
-                boolean ok;
-                if (DocumentsContract.isDocumentUri(this, uri)) {
-                    ok = DocumentsContract.deleteDocument(getContentResolver(), uri);
-                } else {
-                    ok = getContentResolver().delete(uri, null, null) > 0;
-                }
-                if (ok) removed++; else failed++;
-            } catch (Exception e) {
-                failed++;
-            }
-        }
-        if (failed == 0) {
-            toast(removed + " removed from gallery");
-        } else {
-            toast(removed + " removed; " + failed + " couldn't be removed — delete those "
-                    + "from your gallery manually.");
-        }
     }
 
     // ------------------------------------------------------------------

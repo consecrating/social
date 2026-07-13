@@ -1,6 +1,5 @@
 package com.example.instasaver;
 
-import android.content.ClipData;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
@@ -11,12 +10,13 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.IntentSenderRequest;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.Nullable;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.fragment.app.Fragment;
 
-import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -39,10 +39,14 @@ public class AlbumDetailActivity extends AppCompatActivity {
             registerForActivityResult(new ActivityResultContracts.StartActivityForResult(),
                     result -> {
                         if (result.getResultCode() == RESULT_OK && result.getData() != null) {
-                            List<Uri> uris = collectUris(result.getData());
-                            if (!uris.isEmpty()) importInto(uris);
+                            List<Uri> uris = GalleryUtil.collectUris(result.getData());
+                            if (!uris.isEmpty()) confirmAddMode(uris);
                         }
                     });
+
+    private final ActivityResultLauncher<IntentSenderRequest> deleteLauncher =
+            registerForActivityResult(new ActivityResultContracts.StartIntentSenderForResult(),
+                    r -> toast("Originals removed from gallery"));
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -71,44 +75,46 @@ public class AlbumDetailActivity extends AppCompatActivity {
     }
 
     private void launchAddFiles() {
-        Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT);
-        i.addCategory(Intent.CATEGORY_OPENABLE);
-        i.setType(isVideo ? "video/*" : "image/*");
-        i.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
-        i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
         try {
-            addFilesPicker.launch(i);
+            addFilesPicker.launch(GalleryUtil.chooser(isVideo, !isVideo, true));
         } catch (Exception e) {
             toast("No gallery app available.");
         }
     }
 
-    private List<Uri> collectUris(Intent data) {
-        List<Uri> uris = new ArrayList<>();
-        ClipData clip = data.getClipData();
-        if (clip != null) {
-            for (int i = 0; i < clip.getItemCount(); i++) {
-                Uri u = clip.getItemAt(i).getUri();
-                if (u != null) uris.add(u);
-            }
-        } else if (data.getData() != null) {
-            uris.add(data.getData());
-        }
-        return uris;
+    private void confirmAddMode(List<Uri> uris) {
+        new AlertDialog.Builder(this)
+                .setTitle("Add " + uris.size() + " to \"" + album + "\"")
+                .setMessage("Copy keeps the originals in your gallery. Move also removes "
+                        + "them from the gallery so they stay only here.")
+                .setPositiveButton("Move (remove originals)", (d, w) -> importInto(uris, true))
+                .setNeutralButton("Copy", (d, w) -> importInto(uris, false))
+                .setNegativeButton("Cancel", null)
+                .show();
     }
 
-    private void importInto(List<Uri> uris) {
+    private void importInto(List<Uri> uris, boolean removeOriginals) {
         toast("Adding " + uris.size() + "…");
         io.execute(() -> {
             int ok = 0;
+            final List<Uri> imported = new ArrayList<>();
             for (Uri uri : uris) {
-                if (repo.importUri(uri, album) != null) ok++;
+                if (repo.importUri(uri, album) != null) {
+                    ok++;
+                    imported.add(uri);
+                }
             }
             final int done = ok;
             main.post(() -> {
                 toast(done + " added to \"" + album + "\"");
                 Fragment f = getSupportFragmentManager().findFragmentById(R.id.albumContainer);
                 if (f instanceof MediaListFragment) ((MediaListFragment) f).refresh();
+                if (removeOriginals && !imported.isEmpty()) {
+                    int removed = GalleryUtil.deleteOriginals(this, imported, deleteLauncher);
+                    if (removed != GalleryUtil.DELETE_PENDING) {
+                        toast(removed + " removed from gallery");
+                    }
+                }
             });
         });
     }
