@@ -10,8 +10,8 @@ android {
         applicationId "com.example.instasaver"
         minSdk 21
         targetSdk 34
-        versionCode 13
-        versionName "12.1"
+        versionCode 14
+        versionName "12.2"
     }
 
     buildTypes {

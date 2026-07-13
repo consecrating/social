@@ -449,6 +449,13 @@ public class MediaListFragment extends Fragment implements MediaAdapter.Listener
             if (it.file.equals(item.file)) index = i;
         }
 
+        // When opening the viewer from inside the vault, mark it as an internal
+        // navigation so the vault auto-lock doesn't eject us to the home screen
+        // when the viewer is closed.
+        if (mode == MODE_ALBUM) {
+            VaultLock.beginInternalActivity();
+        }
+
         Intent i = new Intent(requireContext(), ViewerActivity.class);
         i.putExtra(ViewerActivity.EXTRA_PATHS, paths);
         i.putExtra(ViewerActivity.EXTRA_VIDEO, video);

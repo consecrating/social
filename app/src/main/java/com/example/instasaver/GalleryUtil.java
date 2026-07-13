@@ -3,6 +3,8 @@ package com.example.instasaver;
 import android.app.Activity;
 import android.app.PendingIntent;
 import android.content.ContentResolver;
+import android.content.ContentUris;
+import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Build;
@@ -76,18 +78,12 @@ public final class GalleryUtil {
         int removed = 0;
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            // Resolve each picked URI to a real MediaStore URI so it can be deleted.
             ArrayList<Uri> mediaUris = new ArrayList<>();
             for (Uri u : uris) {
-                if ("media".equals(u.getAuthority())) {
-                    mediaUris.add(u);
-                } else {
-                    // Non-MediaStore (document) URIs: best-effort direct delete.
-                    try {
-                        if (DocumentsContract.isDocumentUri(activity, u)
-                                && DocumentsContract.deleteDocument(cr, u)) {
-                            removed++;
-                        }
-                    } catch (Exception ignored) { }
+                Uri media = toMediaStoreUri(activity, u);
+                if (media != null && !mediaUris.contains(media)) {
+                    mediaUris.add(media);
                 }
             }
             if (!mediaUris.isEmpty()) {
@@ -102,16 +98,50 @@ public final class GalleryUtil {
             return removed;
         }
 
-        // Android 10 and below: try a direct delete (works with WRITE permission).
+        // Android 10 and below: direct delete (works with WRITE permission).
         for (Uri u : uris) {
             try {
-                if (DocumentsContract.isDocumentUri(activity, u)) {
-                    if (DocumentsContract.deleteDocument(cr, u)) removed++;
-                } else if (cr.delete(u, null, null) > 0) {
+                Uri media = toMediaStoreUri(activity, u);
+                if (media != null && cr.delete(media, null, null) > 0) {
+                    removed++;
+                } else if (DocumentsContract.isDocumentUri(activity, u)
+                        && DocumentsContract.deleteDocument(cr, u)) {
                     removed++;
                 }
             } catch (Exception ignored) { }
         }
         return removed;
+    }
+
+    /**
+     * Convert a picked content URI into a MediaStore URI that can be deleted.
+     * Handles direct media URIs and the media documents provider
+     * (e.g. "image:1234" / "video:1234"). Returns null if it can't be resolved.
+     */
+    static Uri toMediaStoreUri(Context ctx, Uri uri) {
+        if (uri == null) return null;
+        if ("media".equals(uri.getAuthority())) return uri;
+        try {
+            if (DocumentsContract.isDocumentUri(ctx, uri)) {
+                String docId = DocumentsContract.getDocumentId(uri);
+                if (docId != null) {
+                    int colon = docId.indexOf(':');
+                    if (colon > 0) {
+                        String type = docId.substring(0, colon);
+                        long id = Long.parseLong(docId.substring(colon + 1));
+                        Uri base;
+                        if ("image".equalsIgnoreCase(type)) {
+                            base = MediaStore.Images.Media.EXTERNAL_CONTENT_URI;
+                        } else if ("video".equalsIgnoreCase(type)) {
+                            base = MediaStore.Video.Media.EXTERNAL_CONTENT_URI;
+                        } else {
+                            return null;
+                        }
+                        return ContentUris.withAppendedId(base, id);
+                    }
+                }
+            }
+        } catch (Exception ignored) { }
+        return null;
     }
 }
