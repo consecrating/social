@@ -166,30 +166,56 @@ public final class GalleryUtil {
                 if (si >= 0 && !c.isNull(si)) size = c.getLong(si);
             }
         } catch (Exception ignored) { }
-        if (name == null) return null;
 
-        Uri found = queryCollection(cr, MediaStore.Images.Media.EXTERNAL_CONTENT_URI, name, size);
-        if (found == null) {
-            found = queryCollection(cr, MediaStore.Video.Media.EXTERNAL_CONTENT_URI, name, size);
+        final String dn = MediaStore.MediaColumns.DISPLAY_NAME;
+        final String sz = MediaStore.MediaColumns.SIZE;
+        final Uri[] collections = {
+                MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                MediaStore.Video.Media.EXTERNAL_CONTENT_URI
+        };
+
+        // 1) Exact match on name + size.
+        if (name != null && size > 0) {
+            for (Uri col : collections) {
+                Uri f = findFirst(cr, col, dn + "=? AND " + sz + "=?",
+                        new String[]{name, String.valueOf(size)});
+                if (f != null) return f;
+            }
         }
-        return found;
+        // 2) Match on name only (size can differ for re-encoded copies).
+        if (name != null) {
+            for (Uri col : collections) {
+                Uri f = findFirst(cr, col, dn + "=?", new String[]{name});
+                if (f != null) return f;
+            }
+        }
+        // 3) A single item that matches the size exactly (last resort).
+        if (size > 0) {
+            for (Uri col : collections) {
+                Uri f = findUnique(cr, col, sz + "=?", new String[]{String.valueOf(size)});
+                if (f != null) return f;
+            }
+        }
+        return null;
     }
 
-    private static Uri queryCollection(ContentResolver cr, Uri collection,
-                                       String name, long size) {
-        String sel;
-        String[] args;
-        if (size > 0) {
-            sel = MediaStore.MediaColumns.DISPLAY_NAME + "=? AND "
-                    + MediaStore.MediaColumns.SIZE + "=?";
-            args = new String[]{name, String.valueOf(size)};
-        } else {
-            sel = MediaStore.MediaColumns.DISPLAY_NAME + "=?";
-            args = new String[]{name};
-        }
+    private static Uri findFirst(ContentResolver cr, Uri collection,
+                                 String sel, String[] args) {
         try (Cursor c = cr.query(collection,
                 new String[]{MediaStore.MediaColumns._ID}, sel, args, null)) {
             if (c != null && c.moveToFirst()) {
+                return ContentUris.withAppendedId(collection, c.getLong(0));
+            }
+        } catch (Exception ignored) { }
+        return null;
+    }
+
+    /** Return the item only if the query matches exactly one row (avoids guessing). */
+    private static Uri findUnique(ContentResolver cr, Uri collection,
+                                  String sel, String[] args) {
+        try (Cursor c = cr.query(collection,
+                new String[]{MediaStore.MediaColumns._ID}, sel, args, null)) {
+            if (c != null && c.getCount() == 1 && c.moveToFirst()) {
                 return ContentUris.withAppendedId(collection, c.getLong(0));
             }
         } catch (Exception ignored) { }

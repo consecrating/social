@@ -294,7 +294,8 @@ public class AlbumsActivity extends AppCompatActivity implements AlbumFolderAdap
     private void doRemoveOriginals(List<Uri> uris) {
         int removed = GalleryUtil.deleteOriginals(this, uris, deleteLauncher);
         if (removed != GalleryUtil.DELETE_PENDING) {
-            toast(removed + " removed from gallery");
+            toast(removed > 0 ? removed + " removed from gallery"
+                    : "Couldn't locate the originals to remove — delete them from your gallery.");
         }
     }
 
