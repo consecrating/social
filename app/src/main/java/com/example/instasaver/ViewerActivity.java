@@ -1,5 +1,6 @@
 package com.example.instasaver;
 
+import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
@@ -11,6 +12,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageButton;
 import android.widget.ImageView;
+import android.widget.TextView;
 import android.widget.VideoView;
 
 import androidx.annotation.NonNull;
@@ -41,6 +43,8 @@ public class ViewerActivity extends AppCompatActivity {
     private ViewPager2 pager;
     private ViewerAdapter adapter;
     private View topBar;
+    private TextView handleView;
+    private String currentHandle;
 
     private final Handler barHandler = new Handler(Looper.getMainLooper());
     private final Runnable hideBar = () -> topBar.setVisibility(View.GONE);
@@ -67,18 +71,23 @@ public class ViewerActivity extends AppCompatActivity {
         // No position counter in the viewer — the total count is shown on the grid.
         findViewById(R.id.counter).setVisibility(View.GONE);
         topBar = findViewById(R.id.topBar);
+        handleView = findViewById(R.id.handle);
+        handleView.setOnClickListener(v -> openProfile());
         findViewById(R.id.close).setOnClickListener(v -> finish());
 
         pager = findViewById(R.id.viewerPager);
-        adapter = new ViewerAdapter(paths, video, this::toggleBar, this::goPrev, this::goNext);
+        adapter = new ViewerAdapter(paths, video, this::toggleBar, this::showBarAutoHide,
+                this::goPrev, this::goNext);
         pager.setAdapter(adapter);
         pager.setCurrentItem(index, false);
         updateTopBarForType(index);
+        updateHandle(index);
 
         pager.registerOnPageChangeCallback(new ViewPager2.OnPageChangeCallback() {
             @Override
             public void onPageSelected(int position) {
                 updateTopBarForType(position);
+                updateHandle(position);
                 activate(position);
             }
         });
@@ -134,6 +143,49 @@ public class ViewerActivity extends AppCompatActivity {
         if (i < paths.length - 1) pager.setCurrentItem(i + 1, true);
     }
 
+    private void updateHandle(int position) {
+        currentHandle = position >= 0 && position < paths.length
+                ? parseHandle(paths[position]) : null;
+        if (currentHandle != null) {
+            handleView.setText("@" + currentHandle);
+            handleView.setVisibility(View.VISIBLE);
+        } else {
+            handleView.setText("");
+            handleView.setVisibility(View.INVISIBLE);
+        }
+    }
+
+    private void openProfile() {
+        if (currentHandle == null) return;
+        try {
+            startActivity(new Intent(Intent.ACTION_VIEW,
+                    Uri.parse("https://www.instagram.com/" + currentHandle + "/")));
+        } catch (Exception ignored) { }
+    }
+
+    /**
+     * Downloads are named "<handle>-<shortcode>[-N].ext". Extract the handle only
+     * when the part after it really looks like an Instagram shortcode, so imported
+     * gallery files (e.g. "image-20537.jpg") don't show a bogus handle.
+     */
+    static String parseHandle(String path) {
+        String name = new File(path).getName();
+        int dot = name.lastIndexOf('.');
+        String base = dot > 0 ? name.substring(0, dot) : name;
+        int dash = base.indexOf('-');
+        if (dash <= 0) return null;
+        String h = base.substring(0, dash);
+        String rest = base.substring(dash + 1);
+        int nextDash = rest.indexOf('-');
+        String shortcode = nextDash > 0 ? rest.substring(0, nextDash) : rest;
+        if (h.matches("[A-Za-z0-9._]+")
+                && shortcode.length() >= 8
+                && shortcode.matches("[A-Za-z0-9_-]+")) {
+            return h;
+        }
+        return null;
+    }
+
     @Override
     protected void onPause() {
         super.onPause();
@@ -150,15 +202,17 @@ public class ViewerActivity extends AppCompatActivity {
         private final String[] paths;
         private final boolean[] video;
         private final Runnable onImageTap;
+        private final Runnable onVideoTap;
         private final Runnable onPrev;
         private final Runnable onNext;
         private VideoHolder active;
 
         ViewerAdapter(String[] paths, boolean[] video, Runnable onImageTap,
-                      Runnable onPrev, Runnable onNext) {
+                      Runnable onVideoTap, Runnable onPrev, Runnable onNext) {
             this.paths = paths;
             this.video = video;
             this.onImageTap = onImageTap;
+            this.onVideoTap = onVideoTap;
             this.onPrev = onPrev;
             this.onNext = onNext;
         }
@@ -174,7 +228,8 @@ public class ViewerActivity extends AppCompatActivity {
             LayoutInflater inf = LayoutInflater.from(parent.getContext());
             if (viewType == T_VIDEO) {
                 return new VideoHolder(
-                        inf.inflate(R.layout.item_viewer_video, parent, false), onPrev, onNext);
+                        inf.inflate(R.layout.item_viewer_video, parent, false),
+                        onVideoTap, onPrev, onNext);
             }
             return new ImageHolder(
                     inf.inflate(R.layout.item_viewer_image, parent, false), onImageTap);
@@ -240,9 +295,11 @@ public class ViewerActivity extends AppCompatActivity {
             private final GestureDetector detector;
             private final Handler handler = new Handler(Looper.getMainLooper());
             private final Runnable hideControls;
+            private final Runnable onVideoTap;
 
-            VideoHolder(@NonNull View v, Runnable onPrev, Runnable onNext) {
+            VideoHolder(@NonNull View v, Runnable onVideoTap, Runnable onPrev, Runnable onNext) {
                 super(v);
+                this.onVideoTap = onVideoTap;
                 videoView = v.findViewById(R.id.video);
                 controls = v.findViewById(R.id.videoControls);
                 playPause = v.findViewById(R.id.playPause);
@@ -278,13 +335,14 @@ public class ViewerActivity extends AppCompatActivity {
 
                             @Override
                             public boolean onSingleTapConfirmed(MotionEvent e) {
-                                // A tap reveals the controls (which auto-hide after 2s).
+                                // A tap reveals the controls + the handle bar (both auto-hide).
                                 if (controls.getVisibility() == View.VISIBLE) {
                                     handler.removeCallbacks(hideControls);
                                     controls.setVisibility(View.GONE);
                                 } else {
                                     showControls();
                                 }
+                                if (onVideoTap != null) onVideoTap.run();
                                 return true;
                             }
 

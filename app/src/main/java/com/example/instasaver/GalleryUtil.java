@@ -82,6 +82,8 @@ public final class GalleryUtil {
      */
     /** Queue of MediaStore URIs still to delete on Android 10 (sequential consent). */
     private static final ArrayDeque<Uri> legacyQueue = new ArrayDeque<>();
+    /** URIs we've already shown a consent dialog for (avoids re-asking in a loop). */
+    private static final java.util.HashSet<String> legacyConsentAsked = new java.util.HashSet<>();
 
     public static boolean isLegacyDelete() {
         return Build.VERSION.SDK_INT < Build.VERSION_CODES.R;
@@ -119,15 +121,18 @@ public final class GalleryUtil {
         }
 
         // Android 10 (Q): delete each; the OS throws a RecoverableSecurityException
-        // asking the user to allow it. After they allow, we must RETRY the delete.
+        // asking the user to allow it. After they allow, we RETRY the same item.
         legacyQueue.clear();
+        legacyConsentAsked.clear();
         legacyQueue.addAll(mediaUris);
         return pumpLegacyQueue(activity, senderLauncher) ? DELETE_PENDING : 0;
     }
 
     /**
      * Delete queued items until one needs user consent, then launch that consent
-     * dialog. Returns true if a consent dialog was launched (deletion pending).
+     * dialog. The head is retried (not skipped) after consent is granted; if it
+     * still fails after we've already asked once, it is skipped to avoid a loop.
+     * Returns true if a consent dialog was launched (deletion pending).
      */
     private static boolean pumpLegacyQueue(Activity activity,
                                            ActivityResultLauncher<IntentSenderRequest> sender) {
@@ -139,10 +144,12 @@ public final class GalleryUtil {
                 legacyQueue.pollFirst(); // deleted (or already gone) → next
             } catch (Exception e) {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
-                        && e instanceof RecoverableSecurityException) {
+                        && e instanceof RecoverableSecurityException
+                        && !legacyConsentAsked.contains(head.toString())) {
                     try {
                         IntentSender is = ((RecoverableSecurityException) e)
                                 .getUserAction().getActionIntent().getIntentSender();
+                        legacyConsentAsked.add(head.toString());
                         VaultLock.beginInternalActivity();
                         sender.launch(new IntentSenderRequest.Builder(is).build());
                         return true; // wait for consent; head stays in the queue
@@ -150,7 +157,7 @@ public final class GalleryUtil {
                         legacyQueue.pollFirst();
                     }
                 } else {
-                    legacyQueue.pollFirst();
+                    legacyQueue.pollFirst(); // already asked or non-recoverable → skip
                 }
             }
         }
@@ -158,17 +165,12 @@ public final class GalleryUtil {
     }
 
     /**
-     * Call after the Android 10 consent dialog returns OK: retry the granted item,
-     * then keep going. Returns true if another consent dialog was launched.
+     * Call after the Android 10 consent dialog returns OK: the head now has a
+     * write grant, so retrying the delete succeeds. Returns true if another
+     * consent dialog was launched for a subsequent item.
      */
     public static boolean continueLegacyAfterConsent(Activity activity,
                                                      ActivityResultLauncher<IntentSenderRequest> sender) {
-        if (!legacyQueue.isEmpty()) {
-            Uri head = legacyQueue.pollFirst(); // now granted → delete once
-            try {
-                activity.getContentResolver().delete(head, null, null);
-            } catch (Exception ignored) { }
-        }
         return pumpLegacyQueue(activity, sender);
     }
 
